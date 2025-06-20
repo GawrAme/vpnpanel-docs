@@ -77,39 +77,39 @@ fi
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "<code><b>+++++=======-XRAY/${tunnel_name}=======+++++</b>"
-echo -e ""
-echo -e "Remarks: ${USERNAME}"
-echo -e "Domain: ${DOMAIN}"
-echo -e "Quota: ${limit_gb}GB"
-echo -e "Reset Quota Strategy: Bulanan"
-echo -e "================================="
-echo -e "Port TLS: 443, 8443, 8880"
-echo -e "Port nonTLS: 80, 2082, 2083, 3128, 8080"
-echo -e "================================="
-echo -e "password: ${PASSWORD}"
-echo -e "================================="
-echo -e "network: tcp/ws/grpc/httpupgrade"
-echo -e "================================="
-echo -e "path: "
-echo -e "a.) WS: /trojan atau /enter-your-custom-path/trojan"
-echo -e "b.) WS Antiads: /trojan-antiads"
-echo -e "c.) WS Anti Ads & porn: /trojan-antiporn"
-echo -e "d.) GRPC: trojan-service"
-echo -e "e.) HTTP Upgrade: /trojan-http"
-echo -e "f.) HTTP Upgrade AntiADS: /trojan-hu-antiads"
-echo -e "g.) HTTP Upgrade AntiPorn: /trojan-hu-antiporn"
-echo -e "================================="
-echo -e "alpn: "
-echo -e "a.) WS & HU: http/1.1"
-echo -e "b.) GRPC: h2"
-echo -e "c.) TCP: h2"
-echo -e "================================="
-echo -e "tls:"
-echo -e "a.) WS & HU: true (tls), false (nontls)"
-echo -e "b.) GRPC: true"
-echo -e "allowInsecure: true</code>"
-echo -e "================================="
+echo -e "HTML_CODE"
+echo -e "<code><b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
+Remarks: ${USERNAME}
+Domain: ${DOMAIN}
+Quota: ${limit_gb}GB
+Reset Quota Strategy: Bulanan
+=================================
+Port TLS: 443, 8443, 8880
+Port nonTLS: 80, 2082, 2083, 3128, 8080
+=================================
+password: ${PASSWORD}
+=================================
+network: tcp/ws/grpc/httpupgrade
+=================================
+path: 
+a.) WS: /trojan atau /enter-your-custom-path/trojan
+b.) WS Antiads: /trojan-antiads
+c.) WS Anti Ads & porn: /trojan-antiporn
+d.) GRPC: trojan-service
+e.) HTTP Upgrade: /trojan-http
+f.) HTTP Upgrade AntiADS: /trojan-hu-antiads
+g.) HTTP Upgrade AntiPorn: /trojan-hu-antiporn
+=================================
+alpn: 
+a.) WS & HU: http/1.1
+b.) GRPC: h2
+c.) TCP: h2
+=================================
+tls:
+a.) WS & HU: true (tls), false (nontls)
+b.) GRPC: true
+allowInsecure: true
+=================================</code>"
 echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
 echo -e "================================="
 echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
