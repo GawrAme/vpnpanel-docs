@@ -65,7 +65,7 @@ fi
 expire=$(echo "${mod_user}" | jq -r '.expire')
 used_traffic=$(echo "${mod_user}" | jq -r '.used_traffic')
 used_traffic_gb=$(awk "BEGIN {printf \"%.2f\", ${used_traffic}/1024/1024/1024}")
-SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
+SUBS=$(echo "${mod_user}" | jq -r '.subscription_url')
 
 echo -e "<b>+++++ ${tunnel_name} Account Extended +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
