@@ -6,10 +6,12 @@ EXPIRED="$3"
 
 tunnel_name="VLESS"
 tunnel_type="VLESS"
-limit_gb="200"
+limit_gb="1024"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
 expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
+current_date=$(date "+%Y-%m-%d %H:%M:%S")
 
+DOMAIN=$(cat /root/domain)
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
 api_username="YOUR_API_USERNAME"
@@ -30,9 +32,16 @@ req_json='{
   "data_limit_reset_strategy": "month",
   "expire": '"${expired_timestamp}"',
   "inbounds": {
-    "vmess": [
+    "vless": [
+      "'"${tunnel_type}"'_REALITY_FALLBACK",
+      "'"${tunnel_type}"'_REALITY_GRPC",
       "'"${tunnel_type}"'_WS",
-      "'"${tunnel_type}"'_XHTTP"
+      "'"${tunnel_type}"'_WS_ANTIADS",
+      "'"${tunnel_type}"'_WS_ANTIPORN",
+      "'"${tunnel_type}"'_HTTPUPGRADE",
+      "'"${tunnel_type}"'_HU_ANTIADS",
+      "'"${tunnel_type}"'_HU_ANTIPORN",
+      "'"${tunnel_type}"'_GRPC"
     ]
   },
   "next_plan": {
@@ -41,9 +50,9 @@ req_json='{
     "expire": 0,
     "fire_on_either": true
   },
-  "note": "",
+  "note": "CREATED AT '"${current_date}"'",
   "proxies": {
-    "vmess": {
+    "vless": {
       "id": "'"${PASSWORD}"'"
     }
   },
@@ -67,14 +76,48 @@ if [[ "$http_response" != "200" ]]; then
 fi
 
 expire=$(echo "${res_json}" | jq -r '.expire')
-link_ws=$(echo "${res_json}" | jq -r '.links[0]')
-link_xhttp=$(echo "${res_json}" | jq -r '.links[1]')
+SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
-echo -e "Username: <code>${USERNAME}</code>"
-echo -e "Password: <code>${PASSWORD}</code>"
-echo -e "Expired: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
-echo -e "Data Limit: <code>${limit_gb}</code> GB"
-echo -e "Websocket : <code>${link_ws}</code>"
-echo -e "XHTTP: <code>${link_xhttp}</code>"
+echo -e "<b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
+echo -e "Remarks: ${USERNAME}"
+echo -e "Domain: ${DOMAIN}"
+echo -e "Quota: ${limit_gb}GB"
+echo -e "Reset Quota Strategy: Bulanan"
+echo -e "================================="
+echo -e "Port TLS: 443, 8443, 8880"
+echo -e "Port nonTLS: 80, 2082, 2083, 3128, 8080"
+echo -e "================================="
+echo -e "id: ${PASSWORD}"
+echo -e "decryption: none"
+echo -e "================================="
+echo -e "network: reality/ws/grpc/httpupgrade"
+echo -e "================================="
+echo -e "path: "
+echo -e "a.) WS: /vless atau /enter-your-custom-path/vless"
+echo -e "b.) WS Antiads: /vless-antiads"
+echo -e "c.) WS Anti Ads & porn: /vless-antiporn"
+echo -e "d.) GRPC: vless-service"
+echo -e "e.) HTTP Upgrade: /vless-http"
+echo -e "f.) HTTP Upgrade AntiADS: /vless-hu-antiads"
+echo -e "g.) HTTP Upgrade AntiPorn: /vless-hu-antiporn"
+echo -e "================================="
+echo -e "alpn: "
+echo -e "a.) WS/HU: http/1.1"
+echo -e "b.) GRPC: h2"
+echo -e "================================="
+echo -e "tls:"
+echo -e "a.) WS/HU: true (tls), false (nontls)"
+echo -e "b.) GRPC: true"
+echo -e "================================="
+echo -e "Reality Settings"
+echo -e "flow: xtls-rprx-vision"
+echo -e "PublicKey: M1PTcxApfZYmc8mbUUdMncKejBxZbjEwHGEl68zjlWU"
+echo -e "shortIds: 87ae7e1887f2bd1e"
+echo -e "client-fingerprint: chrome"
+echo -e "gRPC serviceName: vless-reality-service"
+echo -e "================================="
+echo -e "allowInsecure: true"
+echo -e "================================="
+echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
+echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
 echo -e "<b>+++++ End of Account Details +++++</b>"
