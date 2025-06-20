@@ -77,8 +77,7 @@ fi
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "HTML_CODE"
-echo -e "<code><b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
+echo -e "<b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
 Remarks: ${USERNAME}
 Domain: ${DOMAIN}
 Quota: ${limit_gb}GB
@@ -109,7 +108,7 @@ tls:
 a.) WS & HU: true (tls), false (nontls)
 b.) GRPC: true
 allowInsecure: true
-=================================</code>"
+================================="
 echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
 echo -e "================================="
 echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
