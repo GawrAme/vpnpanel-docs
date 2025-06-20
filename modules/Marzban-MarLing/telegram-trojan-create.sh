@@ -6,7 +6,7 @@ EXPIRED="$3"
 
 tunnel_name="Trojan"
 tunnel_type="TROJAN"
-limit_gb="200"
+limit_gb="1024"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
 expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
 
@@ -30,9 +30,15 @@ req_json='{
   "data_limit_reset_strategy": "month",
   "expire": '"${expired_timestamp}"',
   "inbounds": {
-    "vmess": [
+    "trojan": [
+      "'"${tunnel_type}"'_TCP",
       "'"${tunnel_type}"'_WS",
-      "'"${tunnel_type}"'_XHTTP"
+      "'"${tunnel_type}"'_WS_ANTIADS",
+      "'"${tunnel_type}"'_WS_ANTIPORN",
+      "'"${tunnel_type}"'_HTTPUPGRADE",
+      "'"${tunnel_type}"'_HU_ANTIADS",
+      "'"${tunnel_type}"'_HU_ANTIPORN",
+      "'"${tunnel_type}"'_GRPC",
     ]
   },
   "next_plan": {
@@ -43,8 +49,8 @@ req_json='{
   },
   "note": "",
   "proxies": {
-    "vmess": {
-      "id": "'"${PASSWORD}"'"
+    "trojan": {
+      "password": "'"${PASSWORD}"'"
     }
   },
   "status": "active",
@@ -69,6 +75,7 @@ fi
 expire=$(echo "${res_json}" | jq -r '.expire')
 link_ws=$(echo "${res_json}" | jq -r '.links[0]')
 link_xhttp=$(echo "${res_json}" | jq -r '.links[1]')
+subs=$(echo "${res_json}" | jq -r '.subscription_url')
 
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
@@ -77,4 +84,5 @@ echo -e "Expired: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
 echo -e "Websocket : <code>${link_ws}</code>"
 echo -e "XHTTP: <code>${link_xhttp}</code>"
+echo -e "Subscription: <code>${subs}</code>"
 echo -e "<b>+++++ End of Account Details +++++</b>"
