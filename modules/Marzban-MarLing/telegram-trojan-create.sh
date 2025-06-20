@@ -38,7 +38,7 @@ req_json='{
       "'"${tunnel_type}"'_HTTPUPGRADE",
       "'"${tunnel_type}"'_HU_ANTIADS",
       "'"${tunnel_type}"'_HU_ANTIPORN",
-      "'"${tunnel_type}"'_GRPC",
+      "'"${tunnel_type}"'_GRPC"
     ]
   },
   "next_plan": {
@@ -57,7 +57,7 @@ req_json='{
   "username": "'"${USERNAME}"'"
 }'
 
-response_file="/tmp/$(uuid).json"
+response_file="/tmp/$(USERNAME).json"
 http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'POST' \
   "http://${api_host}:${api_port}/api/user" \
   -H 'accept: application/json' \
