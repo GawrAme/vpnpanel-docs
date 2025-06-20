@@ -6,10 +6,12 @@ EXPIRED="$3"
 
 tunnel_name="VMESS"
 tunnel_type="VMESS"
-limit_gb="200"
+limit_gb="1024"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
 expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
+current_date=$(date "+%Y-%m-%d %H:%M:%S")
 
+DOMAIN=$(cat /root/domain)
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
 api_username="YOUR_API_USERNAME"
@@ -32,7 +34,12 @@ req_json='{
   "inbounds": {
     "vmess": [
       "'"${tunnel_type}"'_WS",
-      "'"${tunnel_type}"'_XHTTP"
+      "'"${tunnel_type}"'_WS_ANTIADS",
+      "'"${tunnel_type}"'_WS_ANTIPORN",
+      "'"${tunnel_type}"'_HTTPUPGRADE",
+      "'"${tunnel_type}"'_HU_ANTIADS",
+      "'"${tunnel_type}"'_HU_ANTIPORN",
+      "'"${tunnel_type}"'_GRPC"
     ]
   },
   "next_plan": {
@@ -41,7 +48,7 @@ req_json='{
     "expire": 0,
     "fire_on_either": true
   },
-  "note": "",
+  "note": "CREATED AT '"${current_date}"'",
   "proxies": {
     "vmess": {
       "id": "'"${PASSWORD}"'"
@@ -67,14 +74,43 @@ if [[ "$http_response" != "200" ]]; then
 fi
 
 expire=$(echo "${res_json}" | jq -r '.expire')
-link_ws=$(echo "${res_json}" | jq -r '.links[0]')
-link_xhttp=$(echo "${res_json}" | jq -r '.links[1]')
+SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
-echo -e "Username: <code>${USERNAME}</code>"
-echo -e "Password: <code>${PASSWORD}</code>"
-echo -e "Expired: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
-echo -e "Data Limit: <code>${limit_gb}</code> GB"
-echo -e "Websocket : <code>${link_ws}</code>"
-echo -e "XHTTP: <code>${link_xhttp}</code>"
+echo -e "=======-XRAY/VMESS======="
+echo -e ""
+echo -e "Remarks: ${USERNAME}"
+echo -e "Domain: ${DOMAIN}"
+echo -e "Quota: ${limit_gb}GB"
+echo -e "Reset Quota Strategy: Bulanan"
+echo -e "================================="
+echo -e "Port TLS: 443, 8443, 8880"
+echo -e "Port nonTLS: 80, 2082, 2083, 3128, 8080"
+echo -e "================================="
+echo -e "id: ${PASSWORD}"
+echo -e "alterID: 0"
+echo -e "security: auto"
+echo -e "================================="
+echo -e "network: tcp/ws/grpc/httpupgrade"
+echo -e "================================="
+echo -e "path & serviceName: "
+echo -e "a.) WS: /vmess atau /enter-your-custom-path/vmess"
+echo -e "b.) WS AntiADS: /vmess-antiads"
+echo -e "c.) WS AntiPorn: /vmess-antiporn"
+echo -e "d.) GRPC TLS: vmess-service"
+echo -e "e.) HTTP Upgrade: /vmess-http"
+echo -e "f.) HTTP Upgrade AntiADS: /vmess-hu-antiads"
+echo -e "g.) HTTP Upgrade AntiPORN: /vmess-hu-antiporn"
+echo -e "================================="
+echo -e "alpn: "
+echo -e "a.) WS/HU: http/1.1"
+echo -e "b.) GRPC: h2"
+echo -e "================================="
+echo -e "tls:"
+echo -e "a.) WS/HU: true (tls), false (nontls)"
+echo -e "b.) GRPC: true"
+echo -e "allowInsecure: true"
+echo -e "================================="
+echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
+echo -e "================================="
+echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
 echo -e "<b>+++++ End of Account Details +++++</b>"
