@@ -10,6 +10,7 @@ limit_gb="1024"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
 expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
 
+DOMAIN=$(cat /root/domain)
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
 api_username="YOUR_API_USERNAME"
@@ -79,6 +80,7 @@ subs=$(echo "${res_json}" | jq -r '.subscription_url')
 
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
+echo -e "Address: <code>${DOMAIN}</code>"
 echo -e "Password: <code>${PASSWORD}</code>"
 echo -e "Expired: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
