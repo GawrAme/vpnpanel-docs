@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source_code="GegeDevs/vpnpanel-docs"
+source_code="GawrAme/vpnpanel-docs"
 module_name="Marzban-MarLing"
 bin_dir="/etc/gegevps/bin"
 
