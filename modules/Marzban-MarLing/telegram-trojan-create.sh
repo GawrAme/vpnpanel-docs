@@ -246,4 +246,3 @@ echo -e "Link Subscription : <code>https://${DOMAIN}${SUBS}</code>"
 echo -e "================================="
 echo -e "Masa Aktif: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
 echo -e "<b>+++++ End of Account Details +++++</b>"
-rm -r /tmp/${USERNAME}_trojan.json
