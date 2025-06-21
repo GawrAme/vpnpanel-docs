@@ -60,7 +60,7 @@ req_json='{
   "username": "'"${USERNAME}"'"
 }'
 
-response_file="/tmp/$(uuid).json"
+response_file="/tmp/${USERNAME}_trojan.json"
 http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'POST' \
   "http://${api_host}:${api_port}/api/user" \
   -H 'accept: application/json' \
