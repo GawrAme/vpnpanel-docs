@@ -25,7 +25,7 @@ if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
     exit 1
 fi
 
-response_file="/tmp/$(uuid).json"
+response_file="/tmp/${USERNAME}_trojan.json"
 
 # GET USER
 http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'GET' \
