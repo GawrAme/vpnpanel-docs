@@ -33,8 +33,6 @@ req_json='{
   "expire": '"${expired_timestamp}"',
   "inbounds": {
     "vless": [
-      "'"${tunnel_type}"'_REALITY_FALLBACK",
-      "'"${tunnel_type}"'_REALITY_GRPC",
       "'"${tunnel_type}"'_WS",
       "'"${tunnel_type}"'_WS_ANTIADS",
       "'"${tunnel_type}"'_WS_ANTIPORN",
