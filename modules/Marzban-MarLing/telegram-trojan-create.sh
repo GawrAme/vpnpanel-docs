@@ -87,7 +87,7 @@ Port nonTLS: 80, 2082, 2083, 3128, 8080
 =================================
 password: ${PASSWORD}
 =================================
-network: tcp/ws/grpc/httpupgrade
+network: ws/grpc/httpupgrade
 =================================
 path: 
 a.) WS: /trojan atau /enter-your-custom-path/trojan
@@ -101,7 +101,6 @@ g.) HTTP Upgrade AntiPorn: /trojan-hu-antiporn
 alpn: 
 a.) WS & HU: http/1.1
 b.) GRPC: h2
-c.) TCP: h2
 =================================
 tls:
 a.) WS & HU: true (tls), false (nontls)
