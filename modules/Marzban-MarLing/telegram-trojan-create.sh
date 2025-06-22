@@ -33,7 +33,6 @@ req_json='{
   "expire": '"${expired_timestamp}"',
   "inbounds": {
     "trojan": [
-      "'"${tunnel_type}"'_TCP",
       "'"${tunnel_type}"'_WS",
       "'"${tunnel_type}"'_WS_ANTIADS",
       "'"${tunnel_type}"'_WS_ANTIPORN",
