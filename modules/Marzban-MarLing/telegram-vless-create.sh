@@ -76,7 +76,7 @@ fi
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "<b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
+echo -e "<b>+++++=======-XRAY/${tunnel_name}=======+++++</b>"
 echo -e "Remarks: ${USERNAME}"
 echo -e "Domain: ${DOMAIN}"
 echo -e "Quota: ${limit_gb}GB"
