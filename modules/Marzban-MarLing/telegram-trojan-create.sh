@@ -76,38 +76,15 @@ fi
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-echo -e "<b>+++++=======-XRAY/${tunnel_name}=======+++++</b>
-Remarks: ${USERNAME}
-Domain: ${DOMAIN}
-Quota: ${limit_gb}GB
-Reset Quota Strategy: Bulanan
-=================================
-Port TLS: 443, 8443, 8880
-Port nonTLS: 80, 2082, 2083, 3128, 8080
-=================================
-password: ${PASSWORD}
-=================================
-network: ws/grpc/httpupgrade
-=================================
-path: 
-a.) WS: /trojan atau /enter-your-custom-path/trojan
-b.) WS Antiads: /trojan-antiads
-c.) WS Anti Ads & porn: /trojan-antiporn
-d.) GRPC: trojan-service
-e.) HTTP Upgrade: /trojan-http
-f.) HTTP Upgrade AntiADS: /trojan-hu-antiads
-g.) HTTP Upgrade AntiPorn: /trojan-hu-antiporn
-=================================
-alpn: 
-a.) WS & HU: http/1.1
-b.) GRPC: h2
-=================================
-tls:
-a.) WS & HU: true (tls), false (nontls)
-b.) GRPC: true
-allowInsecure: true
-================================="
-echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
+addconfig-trojan.sh ${USERNAME} ${PASSWORD} ${EXPIRED}
+
+echo -e "HTML_CODE"
+echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
+echo -e "Username: <code>${USERNAME}</code>"
+echo -e "Password: <code>${PASSWORD}</code>"
+echo -e "Data Limit: <code>${limit_gb}</code> GB"
+echo -e "Cek Kuota : https://${DOMAIN}${SUBS}"
+echo -e "Detail akun : https://${DOMAIN}/${PASSWORD}-${USERNAME}.txt"
 echo -e "================================="
 echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
 echo -e "<b>+++++ End of Account Details +++++</b>"
