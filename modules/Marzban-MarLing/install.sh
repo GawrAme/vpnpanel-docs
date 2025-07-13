@@ -54,5 +54,7 @@ tunnels_list | while read -r tunnel; do
         install_sh "${tunnel}" "${action}"
     done
 done
-
+wget -O /usr/bin/addconfig-vmess.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-vmess.sh" && chmod +x /usr/bin/addconfig-vmess.sh
+wget -O /usr/bin/addconfig-vless.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-vless.sh" && chmod +x /usr/bin/addconfig-vless.sh
+wget -O /usr/bin/addconfig-trojan.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-trojan.sh" && chmod +x /usr/bin/addconfig-trojan.sh
 echo "Module ${module_name} installed successfully."
