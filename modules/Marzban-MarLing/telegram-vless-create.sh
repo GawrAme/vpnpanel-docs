@@ -12,6 +12,8 @@ expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
 current_date=$(date "+%Y-%m-%d %H:%M:%S")
 
 DOMAIN=$(cat /root/domain)
+IP_ADDR=$(curl -s ifconfig.me)
+
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
 api_username="YOUR_API_USERNAME"
@@ -27,20 +29,32 @@ if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
     exit 1
 fi
 
+# Inbounds array (pakai array Bash, bukan string)
+inbounds_list=(
+  "${tunnel_type}_WS"
+  "${tunnel_type}_WS_ANTIADS"
+  "${tunnel_type}_WS_ANTIPORN"
+  "${tunnel_type}_HTTPUPGRADE"
+  "${tunnel_type}_HU_ANTIADS"
+  "${tunnel_type}_HU_ANTIPORN"
+  "${tunnel_type}_GRPC"
+)
+
+# Jika expired 90 hari, tambahkan REALITY_FALLBACK
+if (( EXPIRED >= 90 )); then
+  inbounds_list+=("${tunnel_type}_REALITY_FALLBACK")
+fi
+
+# Format array jadi JSON list pakai jq
+inbounds_json=$(printf '%s\n' "${inbounds_list[@]}" | jq -R . | jq -s .)
+
+# Buat JSON request ke API
 req_json='{
   "data_limit": '"${limit_bytes}"',
   "data_limit_reset_strategy": "month",
   "expire": '"${expired_timestamp}"',
   "inbounds": {
-    "vless": [
-      "'"${tunnel_type}"'_WS",
-      "'"${tunnel_type}"'_WS_ANTIADS",
-      "'"${tunnel_type}"'_WS_ANTIPORN",
-      "'"${tunnel_type}"'_HTTPUPGRADE",
-      "'"${tunnel_type}"'_HU_ANTIADS",
-      "'"${tunnel_type}"'_HU_ANTIPORN",
-      "'"${tunnel_type}"'_GRPC"
-    ]
+    "vless": '"${inbounds_json}"'
   },
   "next_plan": {
     "add_remaining_traffic": false,
@@ -51,13 +65,15 @@ req_json='{
   "note": "CREATED AT '"${current_date}"'",
   "proxies": {
     "vless": {
-      "id": "'"${PASSWORD}"'"
+      "id": "'"${PASSWORD}"'",
+      "flow": "xtls-rprx-vision"
     }
   },
   "status": "active",
   "username": "'"${USERNAME}"'"
 }'
 
+# Kirim request ke API
 response_file="/tmp/${USERNAME}_vless.json"
 http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'POST' \
   "http://${api_host}:${api_port}/api/user" \
@@ -73,15 +89,22 @@ if [[ "$http_response" != "200" ]]; then
     exit 1
 fi
 
+# Ambil hasil dari response
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-addconfig-vless.sh ${USERNAME} ${PASSWORD} ${EXPIRED}
+# Tambahkan ke konfigurasi lokal
+addconfig-vless.sh "${USERNAME}" "${PASSWORD}" "${EXPIRED}"
 
+# Output ke user
 echo -e "HTML_CODE"
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
 echo -e "UUID: <code>${PASSWORD}</code>"
+if (( EXPIRED >= 90 )); then
+    echo -e "Domain: <code>${DOMAIN}</code>"
+    echo -e "IP Address: <code>${IP_ADDR}</code>"
+fi
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
 echo -e "Cek Kuota : https://${DOMAIN}${SUBS}"
 echo -e "Detail akun : https://${DOMAIN}/${PASSWORD}-${USERNAME}.txt"
