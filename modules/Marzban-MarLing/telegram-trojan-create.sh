@@ -109,7 +109,7 @@ addconfig-trojan.sh "${USERNAME}" "${PASSWORD}" "${EXPIRED}"
 echo -e "HTML_CODE"
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
-echo -e "UUID: <code>${PASSWORD}</code>"
+echo -e "Password: <code>${PASSWORD}</code>"
 echo -e "Domain: <code>${DOMAIN}</code>"
 if (( EXPIRED >= 90 )); then
     echo -e "IP Address: <code>${IP_ADDR}</code>"
