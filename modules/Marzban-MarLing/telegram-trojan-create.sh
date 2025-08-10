@@ -116,7 +116,7 @@ if (( EXPIRED >= 90 )); then
 fi
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
 echo -e "Cek Kuota : https://${DOMAIN}${SUBS}"
-echo -e "Detail akun : https://${DOMAIN}/${UUID}-${USERNAME}.txt"
+echo -e "Detail akun : https://${DOMAIN}/${PASSWORD}-${USERNAME}.txt"
 echo -e "================================="
 echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
 echo -e "<b>+++++ End of Account Details +++++</b>"
