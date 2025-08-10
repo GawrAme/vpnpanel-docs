@@ -12,7 +12,16 @@ expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
 current_date=$(date "+%Y-%m-%d %H:%M:%S")
 
 DOMAIN=$(cat /root/domain)
-IP_ADDR=$(curl -s ifconfig.me)
+IP_FILE="/tmp/myip.txt"
+
+# Kalau file sudah ada dan tidak kosong, pakai isinya
+if [[ -s "$IP_FILE" ]]; then
+    IP_ADDR=$(cat "$IP_FILE")
+else
+    # Ambil IPv4 dari ifconfig.me
+    IP_ADDR=$(curl -s4 ifconfig.me)
+    echo "$IP_ADDR" > "$IP_FILE"
+fi
 
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
@@ -101,8 +110,8 @@ echo -e "HTML_CODE"
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
 echo -e "UUID: <code>${PASSWORD}</code>"
+echo -e "Domain: <code>${DOMAIN}</code>"
 if (( EXPIRED >= 90 )); then
-    echo -e "Domain: <code>${DOMAIN}</code>"
     echo -e "IP Address: <code>${IP_ADDR}</code>"
 fi
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
