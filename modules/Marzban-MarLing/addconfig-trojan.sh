@@ -117,7 +117,19 @@ Format Openclash :
      Host: ${DOMAIN}
    v2ray-http-upgrade: true
    v2ray-http-upgrade-fast-open: false 
-   
+
+4.) Trojan-TCP TLS
+- name: TrojanTCP_${USERNAME}
+  type: trojan
+  server: IPADDRESS
+  port: 443
+  password: ${PASSWORD}
+  udp: true
+  sni: ${DOMAIN}
+  alpn:
+   - h2
+  skip-cert-verify: true
+  
 -==============================-
 
 Contoh Config inject XL Openclash : 
