@@ -4,14 +4,26 @@ USERNAME="$1"
 PASSWORD="$2"
 EXPIRED="$3"
 
-current_date=$(date "+%Y-%m-%d %H:%M:%S")
 tunnel_name="Trojan"
 tunnel_type="TROJAN"
 limit_gb="1024"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
 expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
+current_date=$(date "+%Y-%m-%d %H:%M:%S")
+UUID=$(cat /proc/sys/kernel/random/uuid)
 
 DOMAIN=$(cat /root/domain)
+IP_FILE="/tmp/myip.txt"
+
+# Kalau file sudah ada dan tidak kosong, pakai isinya
+if [[ -s "$IP_FILE" ]]; then
+    IP_ADDR=$(cat "$IP_FILE")
+else
+    # Ambil IPv4 dari ifconfig.me
+    IP_ADDR=$(curl -s4 ifconfig.me)
+    echo "$IP_ADDR" > "$IP_FILE"
+fi
+
 api_host="127.0.0.1"
 api_port="YOUR_API_PORT"
 api_username="YOUR_API_USERNAME"
@@ -27,20 +39,32 @@ if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
     exit 1
 fi
 
+# Inbounds array (pakai array Bash, bukan string)
+inbounds_list=(
+  "${tunnel_type}_WS"
+  "${tunnel_type}_WS_ANTIADS"
+  "${tunnel_type}_WS_ANTIPORN"
+  "${tunnel_type}_HTTPUPGRADE"
+  "${tunnel_type}_HU_ANTIADS"
+  "${tunnel_type}_HU_ANTIPORN"
+  "${tunnel_type}_GRPC"
+)
+
+# Jika expired 90 hari, tambahkan TCP
+if (( EXPIRED >= 90 )); then
+  inbounds_list+=("${tunnel_type}_TCP")
+fi
+
+# Format array jadi JSON list pakai jq
+inbounds_json=$(printf '%s\n' "${inbounds_list[@]}" | jq -R . | jq -s .)
+
+# Buat JSON request ke API
 req_json='{
   "data_limit": '"${limit_bytes}"',
   "data_limit_reset_strategy": "month",
   "expire": '"${expired_timestamp}"',
   "inbounds": {
-    "trojan": [
-      "'"${tunnel_type}"'_WS",
-      "'"${tunnel_type}"'_WS_ANTIADS",
-      "'"${tunnel_type}"'_WS_ANTIPORN",
-      "'"${tunnel_type}"'_HTTPUPGRADE",
-      "'"${tunnel_type}"'_HU_ANTIADS",
-      "'"${tunnel_type}"'_HU_ANTIPORN",
-      "'"${tunnel_type}"'_GRPC"
-    ]
+    "trojan": '"${inbounds_json}"'
   },
   "next_plan": {
     "add_remaining_traffic": false,
@@ -58,6 +82,7 @@ req_json='{
   "username": "'"${USERNAME}"'"
 }'
 
+# Kirim request ke API
 response_file="/tmp/${USERNAME}_trojan.json"
 http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'POST' \
   "http://${api_host}:${api_port}/api/user" \
@@ -73,18 +98,25 @@ if [[ "$http_response" != "200" ]]; then
     exit 1
 fi
 
+# Ambil hasil dari response
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
 
-addconfig-trojan.sh ${USERNAME} ${PASSWORD} ${EXPIRED}
+# Tambahkan ke konfigurasi lokal
+addconfig-trojan.sh "${USERNAME}" "${PASSWORD}" "${EXPIRED}"
 
+# Output ke user
 echo -e "HTML_CODE"
 echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
-echo -e "Password: <code>${PASSWORD}</code>"
+echo -e "UUID: <code>${PASSWORD}</code>"
+echo -e "Domain: <code>${DOMAIN}</code>"
+if (( EXPIRED >= 90 )); then
+    echo -e "IP Address: <code>${IP_ADDR}</code>"
+fi
 echo -e "Data Limit: <code>${limit_gb}</code> GB"
 echo -e "Cek Kuota : https://${DOMAIN}${SUBS}"
-echo -e "Detail akun : https://${DOMAIN}/${PASSWORD}-${USERNAME}.txt"
+echo -e "Detail akun : https://${DOMAIN}/${UUID}-${USERNAME}.txt"
 echo -e "================================="
 echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
 echo -e "<b>+++++ End of Account Details +++++</b>"
