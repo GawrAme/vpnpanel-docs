@@ -154,7 +154,7 @@ Pembuatan akun <b>BERHASIL</b>!
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Domain   : $(printf '%s' "$DOMAIN" | html_escape)
 Password : $(printf '%s' "$PASSWORD" | html_escape)
-Durasi : $(printf '%s' "$EXPIRED" | html_escape)
+Durasi : $(printf '%s' "$EXPIRED" | html_escape) Hari
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Akun dibuat pada : $(printf '%s' "$current_date" | html_escape)
 Subscription : $(printf '%s' "$subscription_full" | html_escape)
