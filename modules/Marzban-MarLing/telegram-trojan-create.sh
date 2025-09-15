@@ -124,6 +124,7 @@ if [[ "$http_response" != "200" ]]; then
 Pembuatan akun <b>GAGAL</b>!
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Durasi : $(printf '%s' "$EXPIRED" | html_escape)
 Waktu    : $(printf '%s' "$current_date" | html_escape)
 HTTP Code: $(printf '%s' "$http_response" | html_escape)
 Detail   : $(printf '%s' "$error_detail" | html_escape)
@@ -149,6 +150,7 @@ Pembuatan akun <b>berhasil</b>!
 <b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Account Created +++++</b>
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Password : $(printf '%s' "$PASSWORD" | html_escape)
+Durasi : $(printf '%s' "$EXPIRED" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Akun dibuat pada : $(printf '%s' "$current_date" | html_escape)
 Subscription : $(printf '%s' "$subscription_full" | html_escape)
