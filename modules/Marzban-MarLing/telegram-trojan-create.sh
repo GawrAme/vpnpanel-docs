@@ -122,6 +122,7 @@ if [[ "$http_response" != "200" ]]; then
       # susun pesan & escape HTML
       mapfile -t MSG_LINES <<EOF
 Pembuatan akun <b>GAGAL</b>!
+-=================================-
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Durasi : $(printf '%s' "$EXPIRED" | html_escape)
@@ -146,7 +147,8 @@ if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
   subscription_full="https://${DOMAIN}${SUBS}"
 
   mapfile -t OK_LINES <<EOF
-Pembuatan akun <b>berhasil</b>!
+Pembuatan akun <b>BERHASIL</b>!
+-=================================-
 <b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Account Created +++++</b>
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Password : $(printf '%s' "$PASSWORD" | html_escape)
