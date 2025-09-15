@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 
+# Configuration Telegram
+source "/etc/gegevps/bin/telegram_config.conf"
+
+# Escape HTML sederhana untuk aman di parse_mode=HTML
+html_escape() {
+  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+# Kirim pesan ke Telegram (auto urlencode teks)
+tg_send() {
+  local RAW_TEXT="$1"
+  # gunakan --data-urlencode agar newline & karakter khusus aman
+  curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+    --data-urlencode "text=$(printf '%s' "$RAW_TEXT")" \
+    --data-urlencode "parse_mode=HTML" \
+    --data-urlencode "disable_web_page_preview=true" >/dev/null 2>&1
+}
+### [ADD] === end Telegram Notifier ===
+
 USERNAME="$1"
 PASSWORD="$2"
 EXPIRED="$3"
@@ -90,12 +110,48 @@ rm -rf "${response_file}"
 
 if [[ "$http_response" != "200" ]]; then
     echo "API Response: $(echo "${res_json}" | jq -r '.detail')"
+
+    ### [ADD] === Telegram: kirim notifikasi GAGAL ===
+    if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
+      error_detail="$(echo "${res_json}" | jq -r '.detail // .message // .error // "Unknown error"')"
+      # susun pesan & escape HTML
+      mapfile -t MSG_LINES <<EOF
+Pembuatan akun <b>GAGAL</b>!
+Username : $(printf '%s' "$USERNAME" | html_escape)
+Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Waktu    : $(printf '%s' "$current_date" | html_escape)
+HTTP Code: $(printf '%s' "$http_response" | html_escape)
+Detail   : $(printf '%s' "$error_detail" | html_escape)
+EOF
+      tg_send "$(printf '%s\n' "${MSG_LINES[@]}")"
+    fi
+    ### [ADD] === end notifikasi GAGAL ===
+
     exit 1
 fi
 
 # Ambil hasil dari response
 expire=$(echo "${res_json}" | jq -r '.expire')
 SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
+
+### [ADD] === Telegram: kirim notifikasi BERHASIL ===
+if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
+  expire_human="$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
+  subscription_full="https://${DOMAIN}${SUBS}"
+
+  mapfile -t OK_LINES <<EOF
+Pembuatan akun <b>berhasil</b>!
+<b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Account Created +++++</b>
+Username : $(printf '%s' "$USERNAME" | html_escape)
+Uid : $(printf '%s' "$PASSWORD" | html_escape)
+Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Akun dibuat pada : $(printf '%s' "$current_date" | html_escape)
+Subscription : $(printf '%s' "$subscription_full" | html_escape)
+Expired : $(printf '%s' "$expire_human" | html_escape)
+EOF
+  tg_send "$(printf '%s\n' "${OK_LINES[@]}")"
+fi
+### [ADD] === end notifikasi BERHASIL ===
 
 # Tambahkan ke konfigurasi lokal
 addconfig-vmess.sh "${USERNAME}" "${PASSWORD}" "${EXPIRED}"
