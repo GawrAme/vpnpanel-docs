@@ -112,6 +112,7 @@ if [[ "$http_response" != "200" ]]; then
     exp_before_h="$(date -d "@${expire_before}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
     mapfile -t TG_FAIL_PUT <<EOF
 Perpanjangan akun <b>GAGAL</b> (MODIFY user)!
+-=================================-
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Waktu    : $(printf '%s' "$current_date" | html_escape)
@@ -140,6 +141,7 @@ subscription_full="https://${DOMAIN}${SUBS}"
 
 mapfile -t TG_OK <<EOF
 Perpanjangan akun <b>BERHASIL</b>!
+-=================================-
 Username : $(printf '%s' "$USERNAME" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Diperpanjang pada : $(printf '%s' "$current_date" | html_escape)
