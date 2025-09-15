@@ -12,9 +12,11 @@ fi
 API_USERNAME="${1}"
 API_PASSWORD="${2}"
 API_PORT="${3}"
+TELEGRAM_BOT_TOKEN="${4}"
+TELEGRAM_CHAT_ID="${5}"
 
-if [[ -z "${API_USERNAME}" || -z "${API_PASSWORD}" || -z "${API_PORT}" ]]; then
-    echo "Usage: $0 <api_username> <api_password> <api_port>"
+if [[ -z "${API_USERNAME}" || -z "${API_PASSWORD}" || -z "${API_PORT}"|| -z "${TELEGRAM_BOT_TOKEN}"|| -z "${TELEGRAM_CHAT_ID}" ]]; then
+    echo "Usage: $0 <api_username> <api_password> <api_port> <telegram_bot_token> <telegram_chat_id>"
     exit 1
 fi
 
@@ -57,4 +59,6 @@ done
 wget -q -O /usr/bin/addconfig-vmess.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-vmess.sh" && chmod +x /usr/bin/addconfig-vmess.sh
 wget -q -O /usr/bin/addconfig-vless.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-vless.sh" && chmod +x /usr/bin/addconfig-vless.sh
 wget -q -O /usr/bin/addconfig-trojan.sh "https://raw.githubusercontent.com/GawrAme/vpnpanel-docs/refs/heads/main/modules/Marzban-MarLing/addconfig-trojan.sh" && chmod +x /usr/bin/addconfig-trojan.sh
+echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" > "${bin_dir}/telegram_config.conf"
+echo "TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID" >> "${bin_dir}/telegram_config.conf"
 echo "Module ${module_name} installed successfully."
