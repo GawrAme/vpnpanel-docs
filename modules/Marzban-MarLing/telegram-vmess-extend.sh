@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 
+############################################
+# [ADD] Telegram Notifier
+############################################
+# Configuration Telegram
+source "/etc/gegevps/bin/telegram_config.conf"
+
+# Escape HTML sederhana untuk parse_mode=HTML
+html_escape() {
+  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+# Kirim pesan ke Telegram dengan aman (URL-encode)
+tg_send() {
+  local RAW_TEXT="$1"
+  if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
+    curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+      --data-urlencode "text=$(printf '%s' "$RAW_TEXT")" \
+      --data-urlencode "parse_mode=HTML" \
+      --data-urlencode "disable_web_page_preview=true" >/dev/null 2>&1
+  fi
+}
+############################################
+# [END ADD]
+############################################
+
 USERNAME="$1"
 PASSWORD="$2"
 EXPIRED="$3"
@@ -37,6 +63,22 @@ rm -rf "${response_file}"
 
 if [[ "$http_response" != "200" ]]; then
     echo "API Response: $(echo "${get_user}" | jq -r '.detail')"
+
+    ############################################
+    # [ADD] Notif Telegram: GAGAL (GET user)
+    ############################################
+    err_detail="$(echo "${get_user}" | jq -r '.detail // .message // .error // "Unknown error"')"
+    mapfile -t TG_FAIL_GET <<EOF
+Perpanjangan akun <b>GAGAL</b> (GET user)!
+Username : $(printf '%s' "$USERNAME" | html_escape)
+Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Waktu    : $(printf '%s' "$current_date" | html_escape)
+HTTP Code: $(printf '%s' "$http_response" | html_escape)
+Detail   : $(printf '%s' "$err_detail" | html_escape)
+EOF
+    tg_send "$(printf '%s\n' "${TG_FAIL_GET[@]}")"
+    ############################################
+
     exit 1
 fi
 
@@ -59,6 +101,26 @@ rm -rf "${response_file}"
 
 if [[ "$http_response" != "200" ]]; then
     echo "API Response: $(echo "${mod_user}" | jq -r '.detail')"
+
+    ############################################
+    # [ADD] Notif Telegram: GAGAL (PUT modify)
+    ############################################
+    err_detail="$(echo "${mod_user}" | jq -r '.detail // .message // .error // "Unknown error"')"
+    exp_before_h="$(date -d "@${expire_before}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
+    mapfile -t TG_FAIL_PUT <<EOF
+Perpanjangan akun <b>GAGAL</b> (MODIFY user)!
+-=================================-
+Username : $(printf '%s' "$USERNAME" | html_escape)
+Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Waktu    : $(printf '%s' "$current_date" | html_escape)
+Durasi   : $(printf '%s' "$EXPIRED" | html_escape) hari
+Sebelum  : $(printf '%s' "$exp_before_h" | html_escape)
+HTTP Code: $(printf '%s' "$http_response" | html_escape)
+Detail   : $(printf '%s' "$err_detail" | html_escape)
+EOF
+    tg_send "$(printf '%s\n' "${TG_FAIL_PUT[@]}")"
+    ############################################
+
     exit 1
 fi
 
@@ -66,6 +128,28 @@ expire=$(echo "${mod_user}" | jq -r '.expire')
 used_traffic=$(echo "${mod_user}" | jq -r '.used_traffic')
 used_traffic_gb=$(awk "BEGIN {printf \"%.2f\", ${used_traffic}/1024/1024/1024}")
 SUBS=$(echo "${mod_user}" | jq -r '.subscription_url')
+
+############################################
+# [ADD] Notif Telegram: BERHASIL
+############################################
+exp_before_h="$(date -d "@${expire_before}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
+exp_after_h="$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
+subscription_full="https://${DOMAIN}${SUBS}"
+
+mapfile -t TG_OK <<EOF
+Perpanjangan akun <b>BERHASIL</b>!
+-=================================-
+Username : $(printf '%s' "$USERNAME" | html_escape)
+Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Diperpanjang pada : $(printf '%s' "$current_date" | html_escape)
+Durasi : $(printf '%s' "$EXPIRED" | html_escape) hari
+Expired (sebelum) : $(printf '%s' "$exp_before_h" | html_escape)
+Expired (sesudah) : $(printf '%s' "$exp_after_h" | html_escape)
+Used Traffic : $(printf '%s' "$used_traffic_gb" | html_escape) GB
+Subscription : $(printf '%s' "$subscription_full" | html_escape)
+EOF
+tg_send "$(printf '%s\n' "${TG_OK[@]}")"
+############################################
 echo -e "HTML_CODE"
 echo -e "<b>+++++ ${tunnel_name} Account Extended +++++</b>"
 echo -e "Username: <code>${USERNAME}</code>"
