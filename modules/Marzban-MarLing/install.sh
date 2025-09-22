@@ -45,6 +45,8 @@ function actions_list(){
     echo "
         create
         extend
+        delete
+        trial
     " | sed 's/^[ \t]*//g;/^$/d'
 }
 
