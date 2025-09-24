@@ -31,7 +31,7 @@ USERNAME="${1:-}"
 PASSWORD="${2:-}"
 EXPIRED="${3:-}"              # tidak terpakai untuk delete, tetap diterima biar kompatibel
 TRANSPORT="${4:-}"            # tidak terpakai
-EXPIRED_TIMESTAMP_BOT="${5:-}"# tidak terpakai
+EXPIRED_TIMESTAMP_BOT="${5:-}"
 
 if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
   echo "Usage: $0 <username> <password> <expired_days> [transport] [expired_timestamp_bot]"
