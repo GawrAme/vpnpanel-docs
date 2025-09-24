@@ -86,12 +86,6 @@ req_json='{
   "inbounds": {
     "trojan": '"${inbounds_json}"'
   },
-  "next_plan": {
-    "add_remaining_traffic": false,
-    "data_limit": 0,
-    "expire": 0,
-    "fire_on_either": true
-  },
   "note": "CREATED AT '"${current_date}"'",
   "proxies": {
     "trojan": {
