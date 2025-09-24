@@ -44,7 +44,7 @@ tunnel_name="VLESS"
 tunnel_type="VLESS"
 limit_gb="2"
 limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
-expired_timestamp=$(date -d "+${EXPIRED_HOURS} hours" +%s)
+expired_timestamp=$(date -d "+60 minutes" +"%s")
 current_date=$(date "+%Y-%m-%d %H:%M:%S")
 
 DOMAIN=$(cat /root/domain)
@@ -81,7 +81,7 @@ inbounds_json=$(printf '%s\n' "${inbounds_list[@]}" | jq -R . | jq -s .)
 # Buat JSON request ke API
 req_json='{
   "data_limit": '"${limit_bytes}"',
-  "data_limit_reset_strategy": "month",
+  "data_limit_reset_strategy": "no_reset",
   "expire": '"${expired_timestamp}"',
   "inbounds": {
     "vless": '"${inbounds_json}"'
