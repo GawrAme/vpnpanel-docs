@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 # Buat akun SS2022 lewat ss2022ctl untuk integrasi bot Telegram
-# Argumen wajib:
-#   USERNAME   -> nama/email user (mis. "linggar3")
-#   EXPIRED    -> hari masa aktif (mis. 30)
 #
 # Opsi via ENV (punya default aman):
 #   QUOTA_GB=1024          # kuota (GB)
