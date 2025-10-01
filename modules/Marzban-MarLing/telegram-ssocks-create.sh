@@ -353,12 +353,6 @@ echo -e "9. Dibuat: $(wib_now)"
 printf "10. Quota: %.2f GB (reset tiap %s hari)\n" "$QUOTA_GB" "$RESET_DAYS"
 echo -e "-=================================-"
 echo -e "Subscription: ${SUB_URL}"
-if [ -n "$DL_URL" ]; then
-  echo "Download config Clash: ${DL_URL}"
-else
-  echo "Download config Clash: ${OUT_TXT}"
-fi
-echo -e "Download config (v2rayNG JSON): ${JSON_LINKS}"
 echo -e "Expired: ${EXPIRE_WIB}"
 echo -e "<b>+++++ End of Account Details +++++</b>"
 echo -e "-=================================-"
