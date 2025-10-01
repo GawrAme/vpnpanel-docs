@@ -1,77 +1,149 @@
 #!/usr/bin/env bash
+# Perpanjang akun SS2022 untuk integrasi bot Telegram (HTML_CODE output)
+# Usage: telegram-ssocks-extend.sh <USERNAME> <ADD_DAYS> [NEW_QUOTA_GB]
+#
+# ENV override (opsional):
+#   INBOUND_TAGS="SSWS,SSWS-ANTIADS,SSWS-ANTIPORN"
+#   PRIMARY_TAG="SSWS"
+#   XRAY_BIN="/usr/local/bin/xray"
+#   XRAY_CFG="/usr/local/etc/xray/config.json"
+#   XRAY_DB="/usr/local/etc/xray/database.json"
+#   XRAY_API="127.0.0.1:10085"
+#   CLIENT_DIR="/var/www/html"
+#   SS_METHOD="2022-blake3-aes-128-gcm"
+#   SS_PORT="443"
+#   HTTP_PORT="80"
 
-USERNAME="$1"
-PASSWORD="$2"
-EXPIRED="$3"
+set -euo pipefail
 
-tunnel_name="Shadowsocks"
-limit_gb="1024"
-limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
-expired_seconds=$((EXPIRED * 24 * 60 * 60))
+USERNAME="${1:-}"; ADD_DAYS="${2:-}"; NEW_QUOTA_GB="${3:-}"
+[ -n "$USERNAME" ] && [[ "$ADD_DAYS" =~ ^[0-9]+$ ]] || {
+  echo "Usage: $0 <USERNAME> <ADD_DAYS> [NEW_QUOTA_GB]" >&2
+  exit 1
+}
 
-DOMAIN=$(cat /root/domain)
-api_host="127.0.0.1"
-api_port="YOUR_API_PORT"
-api_username="YOUR_API_USERNAME"
-api_password="YOUR_API_PASSWORD"
-api_token="$(curl -sSkL -X 'POST' \
-  "http://${api_host}:${api_port}/api/admin/token" \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d "grant_type=password&username=${api_username}&password=${api_password}&scope=&client_id=&client_secret=" | jq -r .access_token)"
+# ===== Konfigurasi =====
+INBOUND_TAGS="${INBOUND_TAGS:-SSWS,SSWS-ANTIADS,SSWS-ANTIPORN}"
+PRIMARY_TAG="${PRIMARY_TAG:-SSWS}"
 
-if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
-    echo "Usage: $0 <username> <password> <expired_days>"
-    exit 1
+XRAY_BIN="${XRAY_BIN:-/usr/local/bin/xray}"
+XRAY_CFG="${XRAY_CFG:-/usr/local/etc/xray/config.json}"
+XRAY_DB="${XRAY_DB:-/usr/local/etc/xray/database.json}"
+XRAY_API="${XRAY_API:-127.0.0.1:10085}"
+
+CLIENT_DIR="${CLIENT_DIR:-/var/www/html}"
+
+SS_METHOD="${SS_METHOD:-2022-blake3-aes-128-gcm}"
+SS_PORT="${SS_PORT:-443}"
+HTTP_PORT="${HTTP_PORT:-80}"
+
+need(){ command -v "$1" >/dev/null 2>&1 || { echo "Need: $1"; exit 1; }; }
+need jq
+need ss2022ctl
+[ -x "$XRAY_BIN" ] || { echo "Xray binary not found: $XRAY_BIN"; exit 1; }
+[ -f "$XRAY_CFG" ] || { echo "Xray config not found: $XRAY_CFG"; exit 1; }
+[ -f "$XRAY_DB" ]  || { echo "DB not found: $XRAY_DB"; exit 1; }
+
+# ===== Helper umum =====
+get_domain(){
+  if [ -f /root/domain ]; then awk 'NF{print; exit}' /root/domain
+  else echo "example.com"; fi
+}
+
+# reset interval (hari) dari DB -> detik -> hari
+get_reset_days(){
+  jq -r --arg e "$USERNAME" '.users[$e].reset_every_seconds // 0' "$XRAY_DB" \
+  | awk '{ d = ($1<=0)?0:int(($1+86399)/86400); print d }'
+}
+
+# WebSocket path per tag (fallback /ss-ws)
+get_wspath_for_tag(){ # $1=tag
+  jq -r --arg tag "$1" '
+    .inbounds[]|select(.tag==$tag)
+    | .streamSettings.wsSettings.path // "/ss-ws"
+  ' "$XRAY_CFG"
+}
+
+# gabung path jadi "a atau b atau c"
+collect_all_paths_atau(){
+  local IFS=',' tag
+  for tag in $INBOUND_TAGS; do
+    tag="$(echo "$tag" | xargs)"
+    get_wspath_for_tag "$tag"
+  done \
+  | awk 'NF{print}' \
+  | awk '!seen[$0]++' \
+  | awk '{a[++n]=$0} END{ if(n==0){print ""} else if(n==1){print a[1]} else { for(i=1;i<=n;i++){ if(i==1) s=a[i]; else s=s " atau " a[i] } print s } }'
+}
+
+# Subscription URL via ss2022ctl
+get_sub_url(){
+  ss2022ctl link "$1" 2>/dev/null || true
+}
+
+# Format WIB
+wib_from_epoch(){ TZ=Asia/Jakarta date -d "@$1" +"%Y-%m-%d %H:%M:%S WIB"; }
+wib_now(){ TZ=Asia/Jakarta date +"%Y-%m-%d %H:%M:%S WIB"; }
+
+# Temukan file config TXT terbaru untuk USERNAME
+find_latest_cfg(){
+  ls -1t "${CLIENT_DIR}"/*-"$USERNAME".txt 2>/dev/null | head -n1 || true
+}
+
+# ===== Validasi user ada =====
+if ! jq -e --arg e "$USERNAME" '.users[$e]' "$XRAY_DB" >/dev/null; then
+  echo "User tidak ada di DB: $USERNAME" >&2
+  exit 2
 fi
 
-response_file="/tmp/$(uuid).json"
-
-# GET USER
-http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'GET' \
-  "http://${api_host}:${api_port}/api/user/${USERNAME}" \
-  -H 'accept: application/json' \
-  -H "Authorization: Bearer ${api_token}")
-get_user=$(cat "${response_file}")
-rm -rf "${response_file}"
-
-if [[ "$http_response" != "200" ]]; then
-    echo "API Response: $(echo "${get_user}" | jq -r '.detail')"
-    exit 1
+# ===== Perpanjang lewat ss2022ctl =====
+if [ -n "$NEW_QUOTA_GB" ]; then
+  ss2022ctl renew "$USERNAME" "$ADD_DAYS" "$NEW_QUOTA_GB" >/dev/null
+else
+  ss2022ctl renew "$USERNAME" "$ADD_DAYS" >/dev/null
 fi
 
-expire_before=$(echo "${get_user}" | jq -r '.expire')
-expire_after=$((expire_before + expired_seconds))
+# ===== Ambil data terkini dari DB =====
+DOMAIN="$(get_domain)"
+EXPIRE_AT="$(jq -r --arg e "$USERNAME" '.users[$e].expire_at // 0' "$XRAY_DB")"
+EXPIRE_WIB="$(wib_from_epoch "$EXPIRE_AT")"
+ENABLED="$(jq -r --arg e "$USERNAME" '.users[$e].enabled // false' "$XRAY_DB")"
 
-# MODIFY_USER
-req_json='{
-  "expire": '"${expire_after}"'
-}'
+QUOTA_BYTES="$(jq -r --arg e "$USERNAME" '.users[$e].quota_bytes // 0' "$XRAY_DB")"
+QUOTA_GB_NOW="$(awk -v b="$QUOTA_BYTES" 'BEGIN{printf "%.2f", b/1024/1024/1024}')"
 
-http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'PUT' \
-  "http://${api_host}:${api_port}/api/user/${USERNAME}" \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${api_token}" \
-  -d "${req_json}")
-mod_user=$(cat "${response_file}")
-rm -rf "${response_file}"
+RESET_DAYS_NOW="$(get_reset_days)"
+PATHS_TXT="$(collect_all_paths_atau)"
+SUB_URL="$(get_sub_url "$USERNAME")"
 
-if [[ "$http_response" != "200" ]]; then
-    echo "API Response: $(echo "${mod_user}" | jq -r '.detail')"
-    exit 1
+TLS_PORT="${SS_PORT}"
+NTLS_PORT="${HTTP_PORT}"
+
+CFG_PATH="$(find_latest_cfg)"
+if [ -n "$CFG_PATH" ]; then
+  BASENAME="$(basename "$CFG_PATH")"
+  DL_URL="https://${DOMAIN}/${BASENAME}"
+else
+  DL_URL="(config belum ditemukan di ${CLIENT_DIR})"
 fi
 
-expire=$(echo "${mod_user}" | jq -r '.expire')
-used_traffic=$(echo "${mod_user}" | jq -r '.used_traffic')
-used_traffic_gb=$(awk "BEGIN {printf \"%.2f\", ${used_traffic}/1024/1024/1024}")
-SUBS=$(echo "${mod_user}" | jq -r '.subscription_url')
-echo -e "HTML_CODE"
-echo -e "<b>+++++ ${tunnel_name} Account Extended +++++</b>"
-echo -e "Username: <code>${USERNAME}</code>"
-echo -e "Password: <code>${PASSWORD}</code>"
-echo -e "Expired: <code>$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')</code>"
-echo -e "Data Limit: <code>${limit_gb}</code> GB"
-echo -e "Used Traffic: <code>${used_traffic_gb}</code> GB"
-echo -e "Link Subscription : https://${DOMAIN}${SUBS}"
-echo -e "<b>+++++ End of Account Details +++++</b>"
+# ===== Output ke bot (HTML_CODE) =====
+echo "HTML_CODE"
+echo "Perpanjangan akun BERHASIL"
+echo "———————————————"
+echo "ShadowSocks-WS Account Extended"
+echo "Username: ${USERNAME}"
+echo "Domain: <code>${DOMAIN}</code>"
+if [ -n "$NEW_QUOTA_GB" ]; then
+  printf "Quota baru: %.2f GB\n" "$NEW_QUOTA_GB"
+fi
+printf "Quota saat ini: %.2f GB (reset tiap %s hari)\n" "$QUOTA_GB_NOW" "$RESET_DAYS_NOW"
+echo "Tambah durasi: ${ADD_DAYS} hari"
+echo "Expired baru: ${EXPIRE_WIB}"
+echo "Status: $( [ "$ENABLED" = "true" ] && echo Aktif || echo Nonaktif )"
+echo "TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
+echo "Path WS: ${PATHS_TXT}"
+echo "Protocol: SS 2022 (${SS_METHOD}) over WS"
+echo "Diperbarui: $(wib_now)"
+echo "Subscription: ${SUB_URL}"
+echo "Download config: ${DL_URL}"
