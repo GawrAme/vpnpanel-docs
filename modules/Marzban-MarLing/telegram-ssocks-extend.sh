@@ -1,19 +1,5 @@
 #!/usr/bin/env bash
 # Perpanjang akun SS2022 untuk integrasi bot Telegram (HTML_CODE output)
-# Usage: telegram-ssocks-extend.sh <USERNAME> <ADD_DAYS> [NEW_QUOTA_GB]
-#
-# ENV override (opsional):
-#   INBOUND_TAGS="SSWS,SSWS-ANTIADS,SSWS-ANTIPORN"
-#   PRIMARY_TAG="SSWS"
-#   XRAY_BIN="/usr/local/bin/xray"
-#   XRAY_CFG="/usr/local/etc/xray/config.json"
-#   XRAY_DB="/usr/local/etc/xray/database.json"
-#   XRAY_API="127.0.0.1:10085"
-#   CLIENT_DIR="/var/www/html"
-#   SS_METHOD="2022-blake3-aes-128-gcm"
-#   SS_PORT="443"
-#   HTTP_PORT="80"
-
 set -euo pipefail
 
 USERNAME="${1:-}"; ADD_DAYS="${2:-}"; NEW_QUOTA_GB="${3:-}"
