@@ -28,6 +28,23 @@ need openssl
 [ -x "$XRAY_BIN" ] || { echo "Xray binary not found: $XRAY_BIN"; exit 1; }
 [ -f "$XRAY_CFG" ] || { echo "Xray config not found: $XRAY_CFG"; exit 1; }
 [ -f "$XRAY_DB" ]  || { echo "DB not found: $XRAY_DB"; exit 1; }
+# ===== Cek user sudah ada di DB? Kalau ada → batal =====
+# Set ALLOW_OVERWRITE=1 untuk mengizinkan overwrite (default: 0 = batal)
+ALLOW_OVERWRITE="${ALLOW_OVERWRITE:-0}"
+
+if jq -e --arg e "$USERNAME" '.users[$e]' "$XRAY_DB" >/dev/null 2>&1; then
+  if [ "$ALLOW_OVERWRITE" != "1" ]; then
+    echo -e "HTML_CODE"
+    echo -e "<b>Pembuatan akun DIBATALKAN</b>"
+    echo -e "———————————————"
+    echo -e "Username: <code>${USERNAME}</code>"
+    echo -e "Alasan: sudah ada di database (duplikat)"
+    echo -e "Tip: set <code>ALLOW_OVERWRITE=1</code> jika ingin menimpa user lama."
+    exit 3
+  else
+    echo "Peringatan: user ${USERNAME} sudah ada. ALLOW_OVERWRITE=1 → lanjut menimpa." >&2
+  fi
+fi
 
 # ---- Helper ambil domain  ----
 get_domain(){
@@ -322,7 +339,6 @@ if [ -f "$OUT_TXT" ]; then
 fi
 
 echo -e "HTML_CODE"
-echo -e "Pembuatan akun BERHASIL"
 echo -e "-=================================-"
 echo -e "<b>+++++ShadowSocks-WS Account Created+++++</b>"
 echo -e "1. Username: ${USERNAME}"
@@ -345,3 +361,4 @@ fi
 echo -e "Download config (v2rayNG JSON): ${JSON_LINKS}"
 echo -e "Expired: ${EXPIRE_WIB}"
 echo -e "<b>+++++ End of Account Details +++++</b>"
+echo -e "-=================================-"
