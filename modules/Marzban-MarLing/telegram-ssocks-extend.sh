@@ -117,14 +117,5 @@ echo -e "5. Expired baru: ${EXPIRE_WIB}"
 echo -e "6. Status: $( [ "${ENABLED}" = "true" ] && echo Aktif || echo Nonaktif )"
 echo -e "7. Diperbarui: $(wib_now)"
 echo -e "8. Subscription: ${SUB_URL}"
-echo -e "Download config CLASH: ${DL_URL_CLASH}"
-
-# Semua JSON per-tag (v2rayNG)
-echo -e "Download config V2RAYNG (JSON):"
-IFS=','; for _tag in ${INBOUND_TAGS}; do
-  _tag="$(echo "${_tag}" | xargs)"          # trim
-  echo -e "- ${_tag}: $(json_link_for_tag "${_tag}")"
-done; unset IFS
-
 echo -e "<b>+++++ End of Account Details +++++</b>"
 echo -e "-=================================-"
