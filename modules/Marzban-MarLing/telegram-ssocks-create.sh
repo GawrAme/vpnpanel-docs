@@ -280,7 +280,7 @@ IFS=','; for TAG in $INBOUND_TAGS; do
   JSON_LINKS="${JSON_LINKS}\n- [${TAG}] https://$(get_domain)/${BASENAME_JSON}"
 done; unset IFS
 
-# kumpulkan semua path (unik), gabung "a atau b atau c"
+# kumpulkan semua path
 collect_all_paths_atau(){
   local IFS=',' tag
   {
@@ -288,11 +288,19 @@ collect_all_paths_atau(){
       tag="$(echo "$tag" | xargs)"
       get_wspath_for_tag "$tag"
     done
-  } | awk 'NF' | awk '!seen[$0]++' | awk '
-    BEGIN{first=1}
-    { if(first){ printf("%s",$0); first=0 } else { printf(" atau %s",$0) } }
-    END{ printf("\n") }
-  '
+  } | awk 'NF' \
+    | awk '!seen[$0]++' \
+    | awk '{
+        a[++n]=$0
+      }
+      END{
+        if(n==0){ print "" ; exit }
+        for(i=1;i<=n;i++){
+          printf("<code>%s</code>", a[i])
+          if(i<n) printf(" atau ")
+        }
+        printf("\n")
+      }'
 }
 
 # ---- 5) Cetak hasil (untuk dikirim balik ke Telegram bot) ----
@@ -315,23 +323,25 @@ fi
 
 echo -e "HTML_CODE"
 echo -e "Pembuatan akun BERHASIL"
-echo -e "———————————————"
-echo -e "ShadowSocks-WS Account Created"
-echo -e "Username: ${USERNAME}"
-echo -e "Domain: <code>${DOMAIN}</code>"
-echo -e "Password : <code>${SERVER_PSK}:${USER_PW_B64}</code>"
-echo -e "Durasi: ${EXPIRED_DAYS} hari"
-echo -e "Limit Device: ${MAX_DEV}"
-echo -e "TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
-echo -e "Path WS: ${ALL_PATHS}"
-echo -e "Protocol: SS 2022 (${SS_METHOD:-2022-blake3-aes-128-gcm}) over WS"
-echo -e "Dibuat: $(wib_now)"
-echo -e "Expired: ${EXPIRE_WIB}"
-printf "Quota: %.2f GB (reset tiap %s hari)\n" "$QUOTA_GB" "$RESET_DAYS"
+echo -e "-=================================-"
+echo -e "<b>+++++ShadowSocks-WS Account Created+++++</b>"
+echo -e "1. Username: ${USERNAME}"
+echo -e "2. Domain: <code>${DOMAIN}</code>"
+echo -e "3. Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
+echo -e "4. Durasi: ${EXPIRED_DAYS} hari"
+echo -e "5. Limit Device: ${MAX_DEV}"
+echo -e "6. TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
+echo -e "7. Path WS: ${ALL_PATHS}"
+echo -e "8. Protocol: SS 2022 (${SS_METHOD:-2022-blake3-aes-128-gcm}) over WS"
+echo -e "9. Dibuat: $(wib_now)"
+printf "10. Quota: %.2f GB (reset tiap %s hari)\n" "$QUOTA_GB" "$RESET_DAYS"
+echo -e "-=================================-"
 echo -e "Subscription: ${SUB_URL}"
 if [ -n "$DL_URL" ]; then
-  echo "Download config: ${DL_URL}"
+  echo "Download config Clash: ${DL_URL}"
 else
-  echo "Download config: ${OUT_TXT}"
+  echo "Download config Clash: ${OUT_TXT}"
 fi
 echo -e "Download config (v2rayNG JSON): ${JSON_LINKS}"
+echo -e "Expired: ${EXPIRE_WIB}"
+echo -e "<b>+++++ End of Account Details +++++</b>"
