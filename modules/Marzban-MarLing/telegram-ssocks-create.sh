@@ -104,9 +104,13 @@ db_set_password "$USERNAME" "$USER_PW_B64"
 if command -v ss2022ctl >/dev/null 2>&1; then
   ss2022ctl clientcfg "$USERNAME" >/dev/null 2>&1 || true
 fi
+
+# ---- 5) Generate UUID ----
+UUID_TXT="$(cat /proc/sys/kernel/random/uuid)"
+
 # lokasi file mengikuti cmd_clientcfg kamu (server-psk diambil dari cfg)
 SERVER_PSK="$(get_server_key)"
-OUT_TXT="${CLIENT_DIR}/${USER_PW_B64}-${USERNAME}.txt"
+OUT_TXT="${CLIENT_DIR}/${UUID_TXT}-${USERNAME}.txt"
 
 # Pastikan file ada (kalau cmd_clientcfg belum dibuat, tulis minimal Clash entry)
 if [ ! -f "$OUT_TXT" ]; then
@@ -137,7 +141,7 @@ if [ ! -f "$OUT_TXT" ]; then
 YAML
 fi
 
-# --- helper: ambil wsPath per-tag & gabungkan untuk tampilan ---
+# ws path per-tag
 get_wspath_for_tag(){ # $1=tag
   jq -r --arg tag "$1" '
     .inbounds[]|select(.tag==$tag)
@@ -145,16 +149,21 @@ get_wspath_for_tag(){ # $1=tag
   ' "$XRAY_CFG"
 }
 
-collect_all_paths(){ # out dalam satu baris "a, b, c"
-  local IFS=',' tag paths=() p
-  for tag in $INBOUND_TAGS; do
-    tag="$(echo "$tag" | xargs)"
-    p="$(get_wspath_for_tag "$tag")"
-    [ -n "$p" ] && paths+=("$p")
-  done
-  # unik + urut ringan
-  printf "%s\n" "${paths[@]}" | awk '!seen[$0]++' | paste -sd', ' -
+# kumpulkan semua path (unik), gabung "a atau b atau c"
+collect_all_paths_atau(){
+  local IFS=',' tag
+  {
+    for tag in $INBOUND_TAGS; do
+      tag="$(echo "$tag" | xargs)"
+      get_wspath_for_tag "$tag"
+    done
+  } | awk 'NF' | awk '!seen[$0]++' | awk '
+    BEGIN{first=1}
+    { if(first){ printf("%s",$0); first=0 } else { printf(" atau %s",$0) } }
+    END{ printf("\n") }
+  '
 }
+
 # ---- 5) Cetak hasil (untuk dikirim balik ke Telegram bot) ----
 DOMAIN="$(get_domain)"
 NOW_EPOCH="$(date +%s)"
@@ -164,7 +173,7 @@ SUB_URL="$(get_sub_url "$USERNAME")"
 
 TLS_PORT="${SS_PORT:-443}"
 NTLS_PORT="${HTTP_PORT:-80}"   
-ALL_PATHS="$(collect_all_paths)"
+ALL_PATHS="$(collect_all_paths_atau)"
 
 DL_URL=""
 BASENAME="$(basename "$OUT_TXT")"
