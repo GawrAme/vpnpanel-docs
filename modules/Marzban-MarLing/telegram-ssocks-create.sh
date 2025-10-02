@@ -46,6 +46,15 @@ if jq -e --arg e "$USERNAME" '.users[$e]' "$XRAY_DB" >/dev/null 2>&1; then
   fi
 fi
 
+# Kalau file sudah ada dan tidak kosong, pakai isinya
+if [[ -s "$IP_FILE" ]]; then
+    IP_ADDR=$(cat "$IP_FILE")
+else
+    # Ambil IPv4 dari ifconfig.me
+    IP_ADDR=$(curl -s4 ifconfig.me)
+    echo "$IP_ADDR" > "$IP_FILE"
+fi
+
 # ---- Helper ambil domain  ----
 get_domain(){
   if [ -f /root/domain ]; then awk 'NF{print; exit}' /root/domain
@@ -343,6 +352,9 @@ echo -e "-=================================-"
 echo -e "<b>+++++ShadowSocks-WS Account Created+++++</b>"
 echo -e "Username: ${USERNAME}"
 echo -e "Domain: <code>${DOMAIN}</code>"
+if (( EXPIRED >= 90 )); then
+    echo -e "IP Address: <code>${IP_ADDR}</code>"
+fi
 echo -e "Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
 echo -e "Durasi: ${EXPIRED_DAYS} hari"
 echo -e "Limit Device: 3"
