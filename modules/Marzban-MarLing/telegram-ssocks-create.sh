@@ -21,6 +21,7 @@ XRAY_CFG="${XRAY_CFG:-/usr/local/etc/xray/config.json}"
 XRAY_DB="${XRAY_DB:-/usr/local/etc/xray/database.json}"
 XRAY_API="${XRAY_API:-127.0.0.1:10085}"
 CLIENT_DIR="${CLIENT_DIR:-/var/www/html}"
+IP_FILE="/tmp/myip.txt"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Need: $1"; exit 1; }; }
 need jq
