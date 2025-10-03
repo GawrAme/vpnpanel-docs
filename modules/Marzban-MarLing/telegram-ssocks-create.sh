@@ -353,7 +353,7 @@ echo -e "-=================================-"
 echo -e "<b>+++++ShadowSocks-WS Account Created+++++</b>"
 echo -e "Username: ${USERNAME}"
 echo -e "Domain: <code>${DOMAIN}</code>"
-if (( EXPIRED >= 90 )); then
+if (( EXPIRED_DAYS >= 90 )); then
     echo -e "IP Address: <code>${IP_ADDR}</code>"
 fi
 echo -e "Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
