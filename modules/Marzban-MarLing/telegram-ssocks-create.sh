@@ -358,7 +358,7 @@ if (( EXPIRED_DAYS >= 90 )); then
 fi
 echo -e "Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
 echo -e "Durasi: ${EXPIRED_DAYS} hari"
-echo -e "Limit Device: 3"
+echo -e "Limit Device: ${MAX_DEV}"
 echo -e "TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
 echo -e "Path WS: ${ALL_PATHS}"
 echo -e "Protocol: SS 2022 (${SS_METHOD:-2022-blake3-aes-128-gcm}) over WS"
