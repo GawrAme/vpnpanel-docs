@@ -17,7 +17,7 @@ USERNAME="${1:-}"; PASSWORD="${2:-}"; EXPIRED_DAYS="${3:-}"
 # ---- Konfigurasi ----
 QUOTA_GB="${QUOTA_GB:-2}"
 RESET_DAYS="0"
-MAX_DEV="${MAX_DEV:-5}"
+MAX_DEV="${MAX_DEV:-3}"
 
 INBOUND_TAGS="${INBOUND_TAGS:-SSWS,SSWS-ANTIADS,SSWS-ANTIPORN,SSHU,SSHU-ANTIADS,SSHU-ANTIPORN}"
 PRIMARY_TAG="${PRIMARY_TAG:-SSWS}"
@@ -462,7 +462,7 @@ if (( EXPIRED_DAYS >= 90 )); then
     echo -e "IP Address: <code>${IP_ADDR}</code>"
 fi
 echo -e "Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
-echo -e "Durasi: ${EXPIRED_DAYS} hari"
+echo -e "Durasi: 1 Jam"
 echo -e "Limit Device: ${MAX_DEV}"
 echo -e "TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
 echo -e "Path: ${ALL_PATHS}"
