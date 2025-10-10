@@ -19,7 +19,7 @@ QUOTA_GB="${QUOTA_GB:-2}"
 RESET_DAYS="0"
 MAX_DEV="${MAX_DEV:-5}"
 
-INBOUND_TAGS="${INBOUND_TAGS:-SSWS,SSWS-ANTIADS,SSWS-ANTIPORN}"
+INBOUND_TAGS="${INBOUND_TAGS:-SSWS,SSWS-ANTIADS,SSWS-ANTIPORN,SSHU,SSHU-ANTIADS,SSHU-ANTIPORN}"
 PRIMARY_TAG="${PRIMARY_TAG:-SSWS}"
 
 XRAY_BIN="${XRAY_BIN:-/usr/local/bin/xray}"
@@ -27,6 +27,7 @@ XRAY_CFG="${XRAY_CFG:-/usr/local/etc/xray/config.json}"
 XRAY_DB="${XRAY_DB:-/usr/local/etc/xray/database.json}"
 XRAY_API="${XRAY_API:-127.0.0.1:10085}"
 CLIENT_DIR="${CLIENT_DIR:-/var/www/html}"
+IP_FILE="/tmp/myip.txt"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Need: $1"; exit 1; }; }
 need jq
@@ -50,6 +51,15 @@ if jq -e --arg e "$USERNAME" '.users[$e]' "$XRAY_DB" >/dev/null 2>&1; then
   else
     echo "Peringatan: user ${USERNAME} sudah ada. ALLOW_OVERWRITE=1 → lanjut menimpa." >&2
   fi
+fi
+
+# Kalau file sudah ada dan tidak kosong, pakai isinya
+if [[ -s "$IP_FILE" ]]; then
+    IP_ADDR=$(cat "$IP_FILE")
+else
+    # Ambil IPv4 dari ifconfig.me
+    IP_ADDR=$(curl -s4 ifconfig.me)
+    echo "$IP_ADDR" > "$IP_FILE"
 fi
 
 # ---- Helper ambil domain  ----
@@ -153,77 +163,114 @@ get_sub_url(){
   fi
 }
 
-# write_v2rayng_json <username> <domain> <server_psk> <user_pw_b64> <tag> <outfile>
-write_v2rayng_json(){
-  local USERNAME="$1" DOMAIN="$2" SERVER_PSK="$3" USER_PW="$4" TAG="$5" OUT="$6"
-  local CIPHER="${SS_METHOD:-2022-blake3-aes-128-gcm}"
-  local PORT="${SS_PORT:-443}"
-  local WSPATH; WSPATH="$(get_wspath_for_tag "$TAG")"
-  mkdir -p "$(dirname "$OUT")"
+# Tulis file v2rayNG JSON untuk 1 tag (WS/HU)
+# Output path dikembalikan via echo (biar bisa kamu cetak sebagai link download)
+make_v2rayng_json_for_tag(){ # $1=tag  $2=uuid_prefix
+  local tag="$1" uuidpfx="$2"
+  local domain port cipher srv upw net path out
+  domain="$(get_domain)"
+  port="${SS_PORT:-443}"
+  cipher="${SS_METHOD:-2022-blake3-aes-128-gcm}"
+  srv="$(get_server_key)"
+  upw="$USER_PW_B64"
+  net="$(get_inbound_transport "$tag")"
+  path="$(get_inbound_path_any "$tag")"; [ -n "$path" ] || path="/"
 
-  cat > "$OUT" <<JSON
+  out="${CLIENT_DIR}/${uuidpfx}-${USERNAME}-${tag}.json"
+
+  # Security TLS di sisi klien tetap "tls" (umumnya kamu terminate TLS di nginx/cdn)
+  # Kalau di setup kamu ada non-TLS untuk HU, silakan ganti ke "none".
+  local stream_json
+  if [ "$net" = "ws" ]; then
+    stream_json=$(cat <<JSON
 {
-  "log": { "loglevel": "warning" },
-  "dns": {
-    "servers": ["1.1.1.1", "8.8.8.8"]
-  },
+  "network": "ws",
+  "security": "tls",
+  "tlsSettings": { "allowInsecure": true, "serverName": "${domain}" },
+  "wsSettings": {
+    "path": "${path}",
+    "headers": { "Host": "${domain}" }
+  }
+}
+JSON
+)
+  elif [ "$net" = "httpupgrade" ]; then
+    stream_json=$(cat <<JSON
+{
+  "network": "httpupgrade",
+  "security": "tls",
+  "tlsSettings": { "allowInsecure": true, "serverName": "${domain}" },
+  "httpupgradeSettings": { "path": "${path}" }
+}
+JSON
+)
+  else
+    # transport lain: default ke ws style biar tetap workable (atau return)
+    stream_json=$(cat <<JSON
+{
+  "network": "ws",
+  "security": "tls",
+  "tlsSettings": { "allowInsecure": true, "serverName": "${domain}" },
+  "wsSettings": {
+    "path": "${path}",
+    "headers": { "Host": "${domain}" }
+  }
+}
+JSON
+)
+  fi
+
+  # tulis JSON v2rayNG
+  mkdir -p "$CLIENT_DIR"
+  cat > "$out" <<JSON
+{
+  "dns": { "servers": ["1.1.1.1","8.8.8.8"] },
   "inbounds": [
     {
-      "tag": "socks",
       "listen": "127.0.0.1",
       "port": 10808,
       "protocol": "socks",
-      "settings": { "auth": "noauth", "udp": true, "userLevel": 8 },
-      "sniffing": { "enabled": true, "destOverride": ["http", "tls"] }
+      "settings": { "udp": true, "auth": "noauth", "userLevel": 8 },
+      "sniffing": { "enabled": true, "routeOnly": false, "destOverride": ["http","tls"] },
+      "tag": "socks"
     }
   ],
   "outbounds": [
     {
-      "tag": "proxy",
       "protocol": "shadowsocks",
       "settings": {
         "servers": [
           {
-            "address": "${DOMAIN}",
-            "port": ${PORT},
-            "method": "${CIPHER}",
-            "password": "${SERVER_PSK}:${USER_PW}",
+            "address": "${domain}",
+            "port": ${port},
+            "method": "${cipher}",
+            "password": "${srv}:${upw}",
             "level": 8,
-            "uot": true,
-            "ota": false
+            "ota": false,
+            "uot": true
           }
         ]
       },
-      "streamSettings": {
-        "network": "ws",
-        "security": "tls",
-        "tlsSettings": {
-          "serverName": "${DOMAIN}",
-          "allowInsecure": true,
-          "alpn": ["http/1.1"],
-          "fingerprint": "chrome"
-        },
-        "wsSettings": {
-          "path": "${WSPATH}",
-          "headers": { "Host": "${DOMAIN}" }
-        }
-      },
+      "streamSettings": ${stream_json},
+      "tag": "proxy",
       "mux": { "enabled": false, "concurrency": -1 }
     },
-    { "tag": "direct", "protocol": "freedom" },
-    { "tag": "block",  "protocol": "blackhole", "settings": { "response": { "type": "http" } } }
+    { "protocol": "freedom", "tag": "direct", "settings": { "domainStrategy": "UseIP" } },
+    { "protocol": "blackhole", "tag": "block", "settings": { "response": { "type": "http" } } }
   ],
   "routing": {
     "domainStrategy": "AsIs",
     "rules": [
-      { "type": "field", "inboundTag": ["socks"], "outboundTag": "proxy" },
+      { "type": "field", "inboundTag": ["dns-module"], "outboundTag": "proxy" },
       { "type": "field", "ip": ["geoip:private"], "outboundTag": "direct" },
       { "type": "field", "domain": ["geosite:private"], "outboundTag": "direct" }
     ]
   },
-  "remarks": "${USERNAME}-${TAG}"
+  "remarks": "${USERNAME}-${tag}"
 }
 JSON
+
+  echo "$out"
 }
 
 # Tanggal WIB helper
@@ -250,80 +297,142 @@ UUID_TXT="$(cat /proc/sys/kernel/random/uuid)"
 SERVER_PSK="$(get_server_key)"
 OUT_TXT="${CLIENT_DIR}/${UUID_TXT}-${USERNAME}.txt"
 
-# Pastikan file ada (kalau cmd_clientcfg belum dibuat, tulis minimal Clash entry + ss:// v2rayNG)
-if [ ! -f "$OUT_TXT" ]; then
-  DOMAIN="$(get_domain)"
-  PORT="${SS_PORT:-443}"
-  CIPHER="${SS_METHOD:-2022-blake3-aes-128-gcm}"
+# Buat satu entri Clash untuk SS2022. Mendukung:
+# - WS  (v2ray-plugin mode websocket)
+# - HU  (HTTP Upgrade) via v2ray-plugin dengan flag khusus
+make_clash_entry_for_tag(){ # $1=tag  $2=domain  $3=server_psk  $4=user_pw_b64  [$5=port] [$6=cipher]
+  local tag="$1" domain="$2" srv="$3" upw="$4" port="${5:-${SS_PORT:-443}}"
+  local cipher="${6:-${SS_METHOD:-2022-blake3-aes-128-gcm}}"
+  local net path host
+  net="$(get_inbound_transport "$tag")"
+  path="$(get_inbound_path_any "$tag")"; [ -n "$path" ] || path="/"
 
-  # Ambil path dari PRIMARY_TAG (fallback /ss-ws)
-  WSPATH_PRIMARY="$(jq -r --arg tag "$PRIMARY_TAG" '.inbounds[]|select(.tag==$tag)|.streamSettings.wsSettings.path // "/ss-ws"' "$XRAY_CFG")"
+  # Host/SNI untuk plugin. Default = domain, bisa override pakai env:
+  host="${CLASH_PLUGIN_HOST:-$domain}"
 
-  # Kalau kamu punya inbound lain (ANTIADS/ANTIPORN) dan mau ikut ditulis:
-  WSPATH_ADS="$(jq -r '.inbounds[]|select(.tag=="SSWS-ANTIADS")|.streamSettings.wsSettings.path // empty' "$XRAY_CFG")"
-  WSPATH_PORN="$(jq -r '.inbounds[]|select(.tag=="SSWS-ANTIPORN")|.streamSettings.wsSettings.path // empty' "$XRAY_CFG")"
-
-  cat > "$OUT_TXT" <<YAML
-# Minimal Clash entry
-- name: ${USERNAME}-${PRIMARY_TAG}
+  case "$net" in
+    ws)
+      cat <<YAML
+- name: ${USERNAME}-${tag}
   type: ss
-  server: ${DOMAIN}
-  port: ${PORT}
-  cipher: ${CIPHER}
-  password: ${SERVER_PSK}:${USER_PW_B64}
+  server: ${domain}
+  port: ${port}
+  cipher: ${cipher}
+  password: ${srv}:${upw}
   udp-over-tcp: true
   plugin: v2ray-plugin
   plugin-opts:
     mode: websocket
-    host: ${DOMAIN}
+    host: ${host}
     tls: true
-    skip-cert-verify: true
-    path: "${WSPATH_PRIMARY}"
+    path: "${path}"
     mux: false
-
+    headers:
+      Host: ${host}
 YAML
-fi
+    ;;
 
-# ws path per-tag
-get_wspath_for_tag(){ # $1=tag
-  jq -r --arg tag "$1" '
-    .inbounds[]|select(.tag==$tag)
-    | .streamSettings.wsSettings.path // "/ss-ws"
-  ' "$XRAY_CFG"
+    httpupgrade)
+      # memakai v2ray-plugin juga, tapi aktifkan flag HU
+      cat <<YAML
+- name: ${USERNAME}-${tag}
+  type: ss
+  server: ${domain}
+  port: ${port}
+  cipher: ${cipher}
+  password: ${srv}:${upw}
+  udp-over-tcp: true
+  plugin: v2ray-plugin
+  plugin-opts:
+    mode: websocket
+    host: ${host}
+    tls: true
+    path: "${path}"
+    mux: false
+    headers:
+      Host: ${host}
+    v2ray-http-upgrade: true
+    v2ray-http-upgrade-fast-open: false
+YAML
+    ;;
+
+    *)
+      # transport lain belum dibuild (biar silent)
+      ;;
+  esac
 }
 
-# ====== Generate JSON per inbound (v2rayNG) & kumpulkan link unduhan ======
-JSON_LINKS=""
-UUID_JSON_BASE="$(cat /proc/sys/kernel/random/uuid)"
-IFS=','; for TAG in $INBOUND_TAGS; do
-  TAG="$(echo "$TAG" | xargs)"
-  OUT_JSON="${CLIENT_DIR}/${UUID_JSON_BASE}-${USERNAME}-${TAG}.json"
-  write_v2rayng_json "$USERNAME" "$(get_domain)" "$SERVER_PSK" "$USER_PW_B64" "$TAG" "$OUT_JSON"
-  BASENAME_JSON="$(basename "$OUT_JSON")"
-  JSON_LINKS="${JSON_LINKS}\n- [${TAG}] https://$(get_domain)/${BASENAME_JSON}"
+# Ambil path dari WS atau HTTP Upgrade (fallback kosong)
+get_inbound_path_any(){ # $1=tag -> "/ss-ws" atau "/ss-hu" dst
+  local tag="$1"
+  jq -r --arg tag "$tag" '
+    .inbounds[] | select(.tag==$tag)
+    | ( .streamSettings.wsSettings.path
+        // .streamSettings.httpupgradeSettings.path
+        // empty )
+  ' "$XRAY_CFG" | sed 's/[[:space:]]\+$//'  # trim right
+}
+
+# (Opsional) agar kompat nama lama, arahkan get_wspath_for_tag -> any
+get_wspath_for_tag(){ get_inbound_path_any "$1"; }
+
+# Ambil jenis transport inbound (ws / httpupgrade / tcp / dst)
+get_inbound_transport(){ # $1=tag -> "ws" / "httpupgrade" / ...
+  local tag="$1"
+  jq -r --arg tag "$tag" '
+    .inbounds[] | select(.tag==$tag)
+    | .streamSettings.network // empty
+  ' "$XRAY_CFG" | sed 's/[[:space:]]\+$//'
+}
+
+# === Dump semua entry Clash (WS & HU) ke file TXT ===
+{
+  echo "# =================== Clash Entries (WS & HTTP Upgrade) ==================="
+  IFS=','; for tag in $INBOUND_TAGS; do
+    tag="$(echo "$tag" | xargs)"
+    make_clash_entry_for_tag "$tag" "$(get_domain)" "$SERVER_PSK" "$USER_PW_B64"
+  done; unset IFS
+} >> "$OUT_TXT"
+
+# === Tulis semua JSON v2rayNG (WS & HTTP Upgrade) ===
+UUID_PFX="$(cat /proc/sys/kernel/random/uuid)"
+JSON_LIST=()
+IFS=','; for tag in $INBOUND_TAGS; do
+  tag="$(echo "$tag" | xargs)"
+  json_path="$(make_v2rayng_json_for_tag "$tag" "$UUID_PFX")"
+  [ -n "$json_path" ] && JSON_LIST+=("$json_path")
 done; unset IFS
 
-# kumpulkan semua path
-collect_all_paths_atau(){
+# Buat daftar link JSON (kalau web-served)
+JSON_LINKS=""
+DOMAIN="$(get_domain)"
+JSON_LIST=()
+IFS=','; for tag in $INBOUND_TAGS; do
+  tag="$(echo "$tag" | xargs)"
+  json_path="$(make_v2rayng_json_for_tag "$tag" "$UUID_PFX")"
+  if [ -n "$json_path" ]; then
+    JSON_LIST+=("$json_path")
+    base="$(basename "$json_path")"
+    JSON_LINKS="${JSON_LINKS}\n- ${tag}: https://${DOMAIN}/${base}"
+  fi
+done; unset IFS
+
+# Gabung semua path unik: `/ss-ws` atau `/ss-ws-antiads` atau `/ss-hu` ...
+collect_all_paths_atau_code(){  # output: `a` atau `b` atau `c`
   local IFS=',' tag
   {
     for tag in $INBOUND_TAGS; do
       tag="$(echo "$tag" | xargs)"
-      get_wspath_for_tag "$tag"
+      get_inbound_path_any "$tag"
     done
-  } | awk 'NF' \
-    | awk '!seen[$0]++' \
-    | awk '{
-        a[++n]=$0
-      }
-      END{
-        if(n==0){ print "" ; exit }
-        for(i=1;i<=n;i++){
-          printf("<code>%s</code>", a[i])
-          if(i<n) printf(" atau ")
-        }
-        printf("\n")
-      }'
+  } | awk 'NF' | awk '!seen[$0]++' | awk '
+    BEGIN{first=1}
+    {
+      if(first){ printf("`%s`",$0); first=0 }
+      else     { printf(" atau `%s`",$0) }
+    }
+    END{ if(!first) printf("\n") }
+  '
 }
 
 # ---- 5) Cetak hasil (untuk dikirim balik ke Telegram bot) ----
@@ -335,7 +444,7 @@ SUB_URL="$(get_sub_url "$USERNAME")"
 
 TLS_PORT="${SS_PORT:-443}"
 NTLS_PORT="${HTTP_PORT:-80}"
-ALL_PATHS="$(collect_all_paths_atau)"
+ALL_PATHS="$(collect_all_paths_atau_code)"
 
 DL_URL=""
 BASENAME="$(basename "$OUT_TXT")"
@@ -346,15 +455,18 @@ fi
 
 echo -e "HTML_CODE"
 echo -e "-=================================-"
-echo -e "<b>+++++ShadowSocks-WS Trial Account Created+++++</b>"
+echo -e "<b>+++++ShadowSocks-2022 Account Created+++++</b>"
 echo -e "Username: ${USERNAME}"
 echo -e "Domain: <code>${DOMAIN}</code>"
+if (( EXPIRED_DAYS >= 90 )); then
+    echo -e "IP Address: <code>${IP_ADDR}</code>"
+fi
 echo -e "Password: <code>${SERVER_PSK}:${USER_PW_B64}</code>"
-echo -e "Durasi: 1 Jam"
-echo -e "Limit Device: 3"
+echo -e "Durasi: ${EXPIRED_DAYS} hari"
+echo -e "Limit Device: ${MAX_DEV}"
 echo -e "TLS/nTLS: ${TLS_PORT}/${NTLS_PORT}"
-echo -e "Path WS: ${ALL_PATHS}"
-echo -e "Protocol: SS 2022 (${SS_METHOD:-2022-blake3-aes-128-gcm}) over WS"
+echo -e "Path: ${ALL_PATHS}"
+echo -e "Protocol: SS 2022 (${SS_METHOD:-2022-blake3-aes-128-gcm})"
 echo -e "Dibuat: $(wib_now)"
 printf "Quota: %.2f GB (reset tiap %s hari)\n" "$QUOTA_GB" "$RESET_DAYS"
 echo -e "-=================================-"
