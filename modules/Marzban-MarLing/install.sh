@@ -34,6 +34,7 @@ function install_sh(){
 
 function tunnels_list(){
     echo "
+        sshovpn
         vmess
         vless
         trojan
@@ -64,3 +65,4 @@ wget -q -O /usr/bin/addconfig-trojan.sh "https://raw.githubusercontent.com/GawrA
 echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" > "${bin_dir}/telegram_config.conf"
 echo "TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID" >> "${bin_dir}/telegram_config.conf"
 echo "Module ${module_name} installed successfully."
+chmod 555 ${bin_dir}/*sh
