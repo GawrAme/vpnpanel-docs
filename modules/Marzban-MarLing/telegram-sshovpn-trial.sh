@@ -24,9 +24,9 @@ TLS_PORT="${LV_TLS_PORT:-443}"
 NTLS_PORT="${LV_NTLS_PORT:-80}"
 
 # Optional default untuk pembuatan akun
-QUOTA_GB="${LV_DEFAULT_QUOTA_GB:-1024}"
+QUOTA_GB="${LV_DEFAULT_QUOTA_GB:-2}"
 MAX_DEVICES="${LV_DEFAULT_MAX_DEVICES:-3}"
-RESET_STRATEGY="${LV_DEFAULT_RESET:-monthly}"
+RESET_STRATEGY="${LV_DEFAULT_RESET:-none}"
 
 # ====== Util ======
 html_escape() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
@@ -73,9 +73,45 @@ EOF
   exit 1
 }
 
-# ====== Hitung expiry human readable ======
-EXPIRE_EPOCH="$(date -u -d "+${EXPIRED} days" +%s 2>/dev/null || true)"
-EXPIRE_HUMAN="$(date -u -d "@${EXPIRE_EPOCH:-0}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo '-')"
+# Zona waktu WIB
+JKT_TZ="Asia/Jakarta"
+
+# Ambil expire epoch dari DB
+DB=/etc/lingvpn/db.json
+EXPIRE_EPOCH="0"
+if command -v jq >/dev/null 2>&1 && [[ -s "$DB" ]]; then
+  EXPIRE_EPOCH="$(jq -r --arg u "$USERNAME" '.users[$u].expire_at // 0' "$DB" 2>/dev/null || echo 0)"
+fi
+
+# Format ke WIB
+if [[ -n "$EXPIRE_EPOCH" && "$EXPIRE_EPOCH" != "0" ]]; then
+  EXPIRE_HUMAN="$(TZ="$JKT_TZ" date -d "@$EXPIRE_EPOCH" '+%Y-%m-%d %H:%M:%S WIB' 2>/dev/null || echo '-')"
+else
+  EXPIRE_HUMAN="-"
+fi
+
+# Waktu sekarang juga pakai WIB
+NOW="$(TZ="$JKT_TZ" date '+%Y-%m-%d %H:%M:%S WIB')"
+
+# === Durasi (human readable) dari EXPIRED (hari; boleh desimal) ===
+DUR_LABEL="$(python3 - <<'PY' "$EXPIRED"
+import sys, math
+try:
+    d = float(sys.argv[1])   # hari (boleh desimal)
+except:
+    d = 0.0
+secs = int(round(max(0.0, d) * 86400))
+if secs >= 86400:
+    days = secs // 86400
+    print(f"{days} hari")
+elif secs >= 3600:
+    hours = secs // 3600
+    print(f"{hours} jam")
+else:
+    mins = max(1, secs // 60)
+    print(f"{mins} menit")
+PY
+)"
 
 # ====== Payload injector ======
 PAYLOAD=$(cat <<TPL
@@ -170,14 +206,14 @@ NOW="$(date '+%Y-%m-%d %H:%M:%S')"
 
 # ====== Telegram: BERHASIL ======
 mapfile -t OK_MSG <<EOF
-Pembuatan akun <b>BERHASIL</b>!
+Pembuatan akun Trial <b>BERHASIL</b>!
 -=================================-
 <b>+++++ SSH-WS Trial Account Created +++++</b>
 Domain: $(printf '%s' "$DOMAIN"    | html_escape)
 Username: $(printf '%s' "$USERNAME"  | html_escape)
 Password: $(printf '%s' "$PASSWORD"  | html_escape)
 Port: $(printf '%s' "$TLS_PORT"  | html_escape) [TLS], $(printf '%s' "$NTLS_PORT" | html_escape) [nTLS]
-Durasi: $(printf '%s' "$EXPIRED"   | html_escape) Hari
+Durasi: $(printf '%s' "$DUR_LABEL"   | html_escape)
 Limit: $(printf '%s' "$LIMIT_H"   | html_escape)
 Status: $(printf '%s' "$STATUS_URL"| html_escape)
 DarkTunnel: <code>$(printf '%s' "$DARKTUNNEL_URL" | html_escape)</code>
@@ -197,7 +233,7 @@ echo -e "Domain: <code>${DOMAIN}</code>"
 echo -e "Username: <code>${USERNAME}</code>"
 echo -e "Password: <code>${PASSWORD}</code>"
 echo -e "Port: ${TLS_PORT} [TLS], ${NTLS_PORT} [nTLS]"
-echo -e "Durasi: ${EXPIRED} Hari"
+echo -e "Durasi: ${DUR_LABEL}"
 echo -e "Limit: ${LIMIT_H}"
 echo -e "Status: ${STATUS_URL}"
 echo -e "-=================================-"
