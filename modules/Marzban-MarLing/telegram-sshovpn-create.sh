@@ -49,6 +49,15 @@ bytes_h() {
   }'
 }
 
+# Kalau file sudah ada dan tidak kosong, pakai isinya
+if [[ -s "$IP_FILE" ]]; then
+    IP_ADDR=$(cat "$IP_FILE")
+else
+    # Ambil IPv4 dari ifconfig.me
+    IP_ADDR=$(curl -s4 ifconfig.me)
+    echo "$IP_ADDR" > "$IP_FILE"
+fi
+
 # ====== Buat akun via lvctl ======
 if ! command -v "$LVCTL" >/dev/null 2>&1; then
   echo "Error: lvctl tidak ditemukan di $LVCTL" >&2
