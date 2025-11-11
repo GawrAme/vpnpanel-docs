@@ -1,120 +1,126 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Configuration Telegram
-source "/etc/gegevps/bin/telegram_config.conf"
+# === Config Telegram (optional) ===
+source "/etc/gegevps/bin/telegram_config.conf" 2>/dev/null || true
 
-# Escape HTML sederhana untuk aman di parse_mode=HTML
+# === Tools / Paths ===
+LVMZ_BIN="${LVMZ_BIN:-/usr/local/sbin/lingvpn_mz}"
+
+# Pastikan jq ada (dipakai untuk parsing JSON)
+command -v jq >/dev/null 2>&1 || { echo "Need: jq" >&2; exit 1; }
+
+# Runner robust untuk lingvpn_mz
+run_lvmz() {
+  # Jika executable langsung, panggil langsung
+  if [[ -x "$LVMZ_BIN" ]]; then
+    "$LVMZ_BIN" "$@"
+    return $?
+  fi
+  # Jika bukan executable, coba lewat python3/python
+  local pybin
+  pybin="$(command -v python3 || command -v python || true)"
+  [[ -n "$pybin" ]] || { echo "ERROR: python3 tidak ditemukan" >&2; return 127; }
+  "$pybin" "$LVMZ_BIN" "$@"
+}
+
+# === Helpers ===
 html_escape() {
   sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
 }
 
-# Kirim pesan ke Telegram (auto urlencode teks)
 tg_send() {
-  local RAW_TEXT="$1"
-  # gunakan --data-urlencode agar newline & karakter khusus aman
+  local RAW_TEXT="${1:-}"
+  [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]] || return 0
   curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
     --data-urlencode "text=$(printf '%s' "$RAW_TEXT")" \
     --data-urlencode "parse_mode=HTML" \
-    --data-urlencode "disable_web_page_preview=true" >/dev/null 2>&1
+    --data-urlencode "disable_web_page_preview=true" >/dev/null 2>&1 || true
 }
-### [ADD] === end Telegram Notifier ===
 
-USERNAME="$1"
-PASSWORD="$2"
-EXPIRED="$3"
+die() { echo "ERROR: $*" >&2; exit 1; }
 
-tunnel_name="VLESS"
-tunnel_type="VLESS"
-limit_gb="1024"
-limit_bytes=$((limit_gb * 1024 * 1024 * 1024))
-expired_timestamp=$(date -d "+${EXPIRED} days" +%s)
-current_date=$(date "+%Y-%m-%d %H:%M:%S")
+# === Args ===
+USERNAME="${1:-}"
+PASSWORD_IGNORED="${2:-}"
+EXPIRED="${3:-}"
 
-DOMAIN=$(cat /root/domain)
+[[ -n "$USERNAME" && -n "${EXPIRED}" ]] || {
+  echo "Usage: $0 <username> <ignored_password> <expired_days>" >&2
+  exit 1
+}
+
+# === Validasi username (tanpa karakter spesial) ===
+if ! [[ "$USERNAME" =~ ^[A-Za-z0-9_]{3,32}$ ]]; then
+  echo "Username tidak valid. Hanya huruf/angka/underscore (_), panjang 3–32." >&2
+  exit 1
+fi
+
+# === Cek binary ===
+[[ -x "$LVMZ_BIN" || -f "$LVMZ_BIN" ]] || die "lingvpn_mz tidak ditemukan di $LVMZ_BIN"
+# upayakan executable kalau memungkinkan
+chmod +x "$LVMZ_BIN" 2>/dev/null || true
+
+# === Cek duplikat username via lingvpn_mz list --json ===
+if run_lvmz list --limit 2000 --json 2>/dev/null \
+   | jq -e --arg u "$USERNAME" '.[] | select(.username==$u)' >/dev/null; then
+  echo "Username '$USERNAME' sudah ada. Pilih nama lain." >&2
+  exit 1
+fi
+
+# === Konfigurasi default ===
+tunnel_name="VLess"
+limit_gb="${limit_gb:-1024}"
+RESET_STRAT="${RESET_STRAT:-month}"
+
+# === Domain & IP (opsional info) ===
+DOMAIN="$(cat /root/domain 2>/dev/null || echo example.com)"
 IP_FILE="/tmp/myip.txt"
-
-# Kalau file sudah ada dan tidak kosong, pakai isinya
 if [[ -s "$IP_FILE" ]]; then
-    IP_ADDR=$(cat "$IP_FILE")
+  IP_ADDR="$(cat "$IP_FILE" 2>/dev/null || true)"
 else
-    # Ambil IPv4 dari ifconfig.me
-    IP_ADDR=$(curl -s4 ifconfig.me)
-    echo "$IP_ADDR" > "$IP_FILE"
+  IP_ADDR="$(curl -s4 ifconfig.me || true)"
+  [[ -n "$IP_ADDR" ]] && echo "$IP_ADDR" > "$IP_FILE" || true
 fi
 
-api_host="127.0.0.1"
-api_port="YOUR_API_PORT"
-api_username="YOUR_API_USERNAME"
-api_password="YOUR_API_PASSWORD"
-api_token="$(curl -sSkL -X 'POST' \
-  "http://${api_host}:${api_port}/api/admin/token" \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d "grant_type=password&username=${api_username}&password=${api_password}&scope=&client_id=&client_secret=" | jq -r .access_token)"
+current_date="$(date '+%Y-%m-%d %H:%M:%S')"
 
-if [[ -z "$USERNAME" || -z "$PASSWORD" || -z "$EXPIRED" ]]; then
-    echo "Usage: $0 <username> <password> <expired_days>"
-    exit 1
+# === Susun argumen lingvpn_mz add ===
+args=( add "$USERNAME" --proto vless --reset "$RESET_STRAT" )
+
+# --- PILIH PLUGIN SESUAI KEBIJAKAN TCP ---
+# < 90 hari TIDAK dapat akses Trojan TCP
+if [[ "$EXPIRED" =~ ^[0-9]+$ && "$EXPIRED" -ge 90 ]]; then
+  # >= 90 hari → izinkan TCP via 'all'
+  args+=( --plugin all )
+else
+  # < 90 hari → eksklusikan TCP → sebutkan ws/grpc/hu saja
+  args+=( --plugin ws grpc hu )
 fi
 
-# Inbounds array (pakai array Bash, bukan string)
-inbounds_list=(
-  "${tunnel_type}_WS"
-  "${tunnel_type}_WS_ANTIADS"
-  "${tunnel_type}_WS_ANTIPORN"
-  "${tunnel_type}_HTTPUPGRADE"
-  "${tunnel_type}_HU_ANTIADS"
-  "${tunnel_type}_HU_ANTIPORN"
-  "${tunnel_type}_GRPC"
-)
-
-# Jika expired 90 hari, tambahkan REALITY_FALLBACK
-if (( EXPIRED >= 90 )); then
-  inbounds_list+=("${tunnel_type}_REALITY_FALLBACK")
+# Days / Always-on
+if [[ "$EXPIRED" =~ ^[1-9][0-9]*$ ]]; then
+  args+=( --days "$EXPIRED" )
+else
+  args+=( --always-on )
 fi
 
-# Format array jadi JSON list pakai jq
-inbounds_json=$(printf '%s\n' "${inbounds_list[@]}" | jq -R . | jq -s .)
+# Quota
+if [[ "$limit_gb" =~ ^[1-9][0-9]*$ ]]; then
+  args+=( --quota-gb "$limit_gb" )
+else
+  args+=( --unlimited )
+fi
 
-# Buat JSON request ke API
-req_json='{
-  "data_limit": '"${limit_bytes}"',
-  "data_limit_reset_strategy": "month",
-  "expire": '"${expired_timestamp}"',
-  "inbounds": {
-    "vless": '"${inbounds_json}"'
-  },
-  "note": "CREATED AT '"${current_date}"'",
-  "proxies": {
-    "vless": {
-      "id": "'"${PASSWORD}"'",
-      "flow": "xtls-rprx-vision"
-    }
-  },
-  "status": "active",
-  "username": "'"${USERNAME}"'"
-}'
+# Output JSON (untuk ambil password/links)
+args+=( --json )
 
-# Kirim request ke API
-response_file="/tmp/${USERNAME}_vless.json"
-http_response=$(curl -sSkL -w "%{http_code}" -o "${response_file}" -X 'POST' \
-  "http://${api_host}:${api_port}/api/user" \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${api_token}" \
-  -d "${req_json}")
-res_json=$(cat "${response_file}")
-rm -rf "${response_file}"
-
-if [[ "$http_response" != "200" ]]; then
-    echo "API Response: $(echo "${res_json}" | jq -r '.detail')"
-
-    ### [ADD] === Telegram: kirim notifikasi GAGAL ===
-    if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
-      error_detail="$(echo "${res_json}" | jq -r '.detail // .message // .error // "Unknown error"')"
-      # susun pesan & escape HTML
-      mapfile -t MSG_LINES <<EOF
+# === Eksekusi tambah user via lingvpn_mz ===
+resp_json="$(run_lvmz "${args[@]}" 2>&1)" || {
+  # kirim notifikasi gagal
+  if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+    mapfile -t MSG <<EOF
 Pembuatan akun <b>GAGAL</b>!
 -=================================-
 Username : $(printf '%s' "$USERNAME" | html_escape)
@@ -122,57 +128,73 @@ Domain   : $(printf '%s' "$DOMAIN" | html_escape)
 Protocol : $(printf '%s' "$tunnel_name" | html_escape)
 Durasi   : $(printf '%s' "$EXPIRED" | html_escape)
 Waktu    : $(printf '%s' "$current_date" | html_escape)
-HTTP Code: $(printf '%s' "$http_response" | html_escape)
-Detail   : $(printf '%s' "$error_detail" | html_escape)
+Detail   : $(printf '%s' "$resp_json" | html_escape)
 EOF
-      tg_send "$(printf '%s\n' "${MSG_LINES[@]}")"
-    fi
-    ### [ADD] === end notifikasi GAGAL ===
+    tg_send "$(printf '%s\n' "${MSG[@]}")"
+  fi
+  die "lingvpn_mz add gagal: $resp_json"
+}
 
-    exit 1
+# Pastikan JSON valid
+if ! echo "$resp_json" | jq -e . >/dev/null 2>&1; then
+  die "Output bukan JSON: $resp_json"
 fi
 
-# Ambil hasil dari response
-expire=$(echo "${res_json}" | jq -r '.expire')
-SUBS=$(echo "${res_json}" | jq -r '.subscription_url')
+# === Ambil field dari JSON ===
+expire_ts="$(echo "$resp_json" | jq -r '.expire // 0')"
+vless_uuid="$(echo "$resp_json" | jq -r '.proxies.vless.id // "-"')"
+sub_rel="$(echo "$resp_json" | jq -r '.subscription_url // ""')"
+created_at="$(echo "$resp_json" | jq -r '.created_at // .createdAt // ""')"
 
-### [ADD] === Telegram: kirim notifikasi BERHASIL ===
-if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
-  expire_human="$(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
-  subscription_full="https://${DOMAIN}${SUBS}"
+# Format subscription URL
+if [[ -n "$sub_rel" && "$sub_rel" == /* ]]; then
+  SUBS="https://${DOMAIN}${sub_rel}"
+else
+  SUBS="${sub_rel:-https://${DOMAIN}/sub}"
+fi
 
-  mapfile -t OK_LINES <<EOF
+# Expire to human
+if [[ "$expire_ts" =~ ^[0-9]+$ && "$expire_ts" -gt 0 ]]; then
+  expire_human="$(date -d "@${expire_ts}" '+%Y-%m-%d %H:%M:%S')"
+else
+  expire_human="AlwaysON"
+fi
+
+# === Notifikasi BERHASIL ===
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+  mapfile -t OK <<EOF
 Pembuatan akun <b>BERHASIL</b>!
 -=================================-
 <b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Account Created +++++</b>
-Username : $(printf '%s' "$USERNAME" | html_escape)
-Domain   : $(printf '%s' "$DOMAIN" | html_escape)
-UUID     : $(printf '%s' "$PASSWORD" | html_escape)
-Durasi   : $(printf '%s' "$EXPIRED" | html_escape) Hari
-Protocol : $(printf '%s' "$tunnel_name" | html_escape)
+Username   : $(printf '%s' "$USERNAME" | html_escape)
+Domain     : $(printf '%s' "$DOMAIN" | html_escape)
+Password   : $(printf '%s' "$trojan_pass" | html_escape)
+Durasi     : $(printf '%s' "$EXPIRED" | html_escape) Hari
+Protocol   : $(printf '%s' "$tunnel_name" | html_escape)
 Akun dibuat pada : $(printf '%s' "$current_date" | html_escape)
-Subscription : $(printf '%s' "$subscription_full" | html_escape)
-Expired : $(printf '%s' "$expire_human" | html_escape)
+Subscription: $(printf '%s' "$SUBS" | html_escape)
+Expired     : $(printf '%s' "$expire_human" | html_escape)
 EOF
-  tg_send "$(printf '%s\n' "${OK_LINES[@]}")"
+  tg_send "$(printf '%s\n' "${OK[@]}")"
 fi
-### [ADD] === end notifikasi BERHASIL ===
 
-# Tambahkan ke konfigurasi lokal
-addconfig-vless.sh "${USERNAME}" "${PASSWORD}" "${EXPIRED}"
-
-# Output ke user
-echo -e "HTML_CODE"
-echo -e "<b>+++++ ${tunnel_name} Account Created +++++</b>"
-echo -e "Username: <code>${USERNAME}</code>"
-echo -e "UUID: <code>${PASSWORD}</code>"
-echo -e "Domain: <code>${DOMAIN}</code>"
-if (( EXPIRED >= 90 )); then
-    echo -e "IP Address: <code>${IP_ADDR}</code>"
+# === (Opsional) Tambahkan ke konfigurasi lokal jika perlu ===
+if command -v addconfig-vless.sh >/dev/null 2>&1; then
+  # PASSWORD_IGNORED diganti password asli dari lingvpn_mz
+  addconfig-vless.sh "${USERNAME}" "${vless_uuid}" "${EXPIRED}" || true
 fi
-echo -e "Data Limit: <code>${limit_gb}</code> GB"
-echo -e "Cek Kuota : https://${DOMAIN}${SUBS}"
-echo -e "Detail akun : https://${DOMAIN}/${PASSWORD}-${USERNAME}.txt"
-echo -e "================================="
-echo -e "Masa Aktif: $(date -d "@${expire}" '+%Y-%m-%d %H:%M:%S')"
-echo -e "<b>+++++ End of Account Details +++++</b>"
+
+# === Output ke STDOUT (HTML-ish) ===
+echo "HTML_CODE"
+echo "<b>+++++ ${tunnel_name} Account Created +++++</b>"
+echo "Username: <code>${USERNAME}</code>"
+echo "UUID: <code>${vless_uuid}</code>"
+echo "Domain: <code>${DOMAIN}</code>"
+if [[ "$EXPIRED" =~ ^[0-9]+$ && "$EXPIRED" -ge 90 && -n "${IP_ADDR:-}" ]]; then
+  echo "IP Address: <code>${IP_ADDR}</code>"
+fi
+echo "Data Limit: <code>${limit_gb}</code> GB"
+echo "Cek Kuota : ${SUBS}"
+echo "================================="
+echo "Masa Aktif: ${expire_human}"
+echo "<b>+++++ End of Account Details +++++</b>"
