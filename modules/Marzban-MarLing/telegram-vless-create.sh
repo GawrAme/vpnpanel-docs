@@ -168,7 +168,7 @@ Pembuatan akun <b>BERHASIL</b>!
 <b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Account Created +++++</b>
 Username   : $(printf '%s' "$USERNAME" | html_escape)
 Domain     : $(printf '%s' "$DOMAIN" | html_escape)
-Password   : $(printf '%s' "$trojan_pass" | html_escape)
+UUID       : $(printf '%s' "$vless_uuid" | html_escape)
 Durasi     : $(printf '%s' "$EXPIRED" | html_escape) Hari
 Protocol   : $(printf '%s' "$tunnel_name" | html_escape)
 Akun dibuat pada : $(printf '%s' "$current_date" | html_escape)
