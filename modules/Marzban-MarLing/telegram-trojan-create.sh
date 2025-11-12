@@ -114,6 +114,9 @@ else
   args+=( --unlimited )
 fi
 
+#note
+args+=( --note "CREATED AT ${current_date}" )
+
 # Output JSON (untuk ambil password/links)
 args+=( --json )
 
