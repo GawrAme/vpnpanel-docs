@@ -182,7 +182,7 @@ EOF
 fi
 
 # === (Opsional) Tambahkan ke konfigurasi lokal jika perlu ===
-if command -v addconfig-vless.sh >/dev/null 2>&1; then
+if command -v addconfig-vmess.sh >/dev/null 2>&1; then
   # PASSWORD_IGNORED diganti password asli dari lingvpn_mz
   addconfig-vless.sh "${USERNAME}" "${vless_uuid}" "${EXPIRED}" || true
 fi
