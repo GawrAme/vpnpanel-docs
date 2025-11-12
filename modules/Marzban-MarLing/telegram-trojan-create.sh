@@ -74,6 +74,7 @@ tunnel_name="Trojan"
 limit_gb="${limit_gb:-1024}"
 PLUGIN="${PLUGIN:-all}"
 RESET_STRAT="${RESET_STRAT:-month}"
+MAX_DEV="${MAX_DEV:-3}"
 
 # === Domain & IP (opsional info) ===
 DOMAIN="$(cat /root/domain 2>/dev/null || echo example.com)"
@@ -113,6 +114,9 @@ if [[ "$limit_gb" =~ ^[1-9][0-9]*$ ]]; then
 else
   args+=( --unlimited )
 fi
+
+#maxdev
+args+=( --max-dev "${MAX_DEV}" )
 
 #note
 args+=( --note "CREATED AT ${current_date}" )
@@ -198,6 +202,7 @@ if [[ "$EXPIRED" =~ ^[0-9]+$ && "$EXPIRED" -ge 90 && -n "${IP_ADDR:-}" ]]; then
   echo "IP Address: <code>${IP_ADDR}</code>"
 fi
 echo "Data Limit: <code>${limit_gb}</code> GB"
+echo "Max Device: ${MAX_DEV} Device [1STB atau 2HP]"
 echo "Cek Kuota : ${SUBS}"
 echo "================================="
 echo "Masa Aktif: ${expire_human}"
