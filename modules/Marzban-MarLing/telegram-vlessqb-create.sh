@@ -191,7 +191,7 @@ Pembuatan akun <b>BERHASIL</b>!
 <b>+++++ $(printf '%s' "$tunnel_name" | html_escape) Quota Account Created +++++</b>
 Username: $(printf '%s' "$USERNAME" | html_escape)
 Domain: $(printf '%s' "$DOMAIN" | html_escape)
-UUID: $(printf '%s' "$vmess_uuid" | html_escape)
+UUID: $(printf '%s' "$vless_uuid" | html_escape)
 Durasi: $(printf '%s' "$DAYS" | html_escape) Hari
 Quota: $(printf '%s' "$QUOTA_GB" | html_escape) GB
 Cycle Reset: $(printf '%s' "$CYCLE_RAW" | html_escape)
