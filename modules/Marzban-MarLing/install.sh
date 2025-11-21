@@ -39,6 +39,9 @@ function tunnels_list(){
         vless
         trojan
         ssocks
+        vmessqb
+        vlessqb
+        trojanqb
     " | sed 's/^[ \t]*//g;/^$/d'
 }
 
