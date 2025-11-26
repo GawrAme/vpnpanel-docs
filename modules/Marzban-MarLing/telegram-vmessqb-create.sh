@@ -70,7 +70,7 @@ case "$CYCLE" in
     ;;
   *)
     # default kalau ada typo → month
-    RESET_STRAT="month"
+    RESET_STRAT="day"
     ;;
 esac
 
