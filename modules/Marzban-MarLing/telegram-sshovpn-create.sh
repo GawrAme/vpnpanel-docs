@@ -26,6 +26,7 @@ QUOTA_GB="${LV_DEFAULT_QUOTA_GB:-1024}"
 MAX_DEVICES="${LV_DEFAULT_MAX_DEVICES:-3}"
 RESET_STRATEGY="${LV_DEFAULT_RESET:-monthly}"
 IP_FILE="/tmp/myip.txt"
+ZIVPN_CONFIG="/etc/zivpn/config.json"  # config server ZIVPN (read-only)
 
 # ====== Util ======
 html_escape() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
@@ -91,6 +92,37 @@ GET ${WS_PATH}?u=${USERNAME}&p=${PASSWORD} HTTP/1.1[crlf]Host: ${DOMAIN}[crlf]Up
 TPL
 )
 
+# ====== Baca info ZIVPN (jika ada) ======
+ZIVPN_PORT=""
+ZIVPN_OBFS=""
+if [[ -s "$ZIVPN_CONFIG" ]]; then
+  ZIVPN_INFO="$(python3 - "$ZIVPN_CONFIG" <<'PY'
+import sys, json
+cfg_path = sys.argv[1]
+try:
+    with open(cfg_path, "r") as f:
+        cfg = json.load(f)
+    listen = str(cfg.get("listen", "")).strip()
+    if ":" in listen:
+        port_str = listen.split(":")[-1]
+    else:
+        port_str = listen
+    port = ""
+    if port_str:
+        try:
+            port = str(int(port_str))
+        except Exception:
+            port = ""
+    obfs = cfg.get("obfs") or ""
+    print(f"{port}|{obfs}")
+except Exception:
+    print("|")
+PY
+  )"
+  ZIVPN_PORT="${ZIVPN_INFO%%|*}"
+  ZIVPN_OBFS="${ZIVPN_INFO#*|}"
+fi
+
 # ====== Buat Status URL (lvsub) pakai HMAC /etc/lingvpn/sub.secret ======
 STATUS_URL="-"
 if [[ -s /etc/lingvpn/sub.secret ]]; then
@@ -105,39 +137,8 @@ PY
 fi
 
 # ====== Buat DarkTunnel import URL ======
-DARKTUNNEL_URL="$(python3 - <<'PY'
-import json,base64,sys,os
-user  = os.environ.get("DT_USER")
-pw    = os.environ.get("DT_PASS")
-dom   = os.environ.get("DT_DOMAIN")
-wsp   = os.environ.get("DT_PATH")
-tls_p = int(os.environ.get("DT_TLS_PORT","443"))
-payload = f"GET {wsp}?u={user}&p={pw} HTTP/1.1[crlf]Host: {dom}[crlf]Upgrade: WebSocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]"
-obj = {
-  "type":"SSH",
-  "name":"LingVPN",
-  "sshTunnelConfig":{
-    "sshConfig":{
-      "host": dom,
-      "port": tls_p,
-      "username": user,
-      "password": pw
-    },
-    "injectConfig":{
-      "mode":"DIRECT_SNI",
-      "serverNameIndication": dom,
-      "payload": payload
-    }
-  }
-}
-js = json.dumps(obj,separators=(',',':'),ensure_ascii=False).encode()
-print("darktunnel://" + base64.b64encode(js).decode())
-PY
-)"
-
-export DT_USER="$USERNAME" DT_PASS="$PASSWORD" DT_DOMAIN="$DOMAIN" DT_PATH="$WS_PATH" DT_TLS_PORT="$TLS_PORT"
 DARKTUNNEL_URL="$(DT_USER="$USERNAME" DT_PASS="$PASSWORD" DT_DOMAIN="$DOMAIN" DT_PATH="$WS_PATH" DT_TLS_PORT="$TLS_PORT" python3 - <<'PY'
-import json,base64,sys,os
+import json,base64,os
 user  = os.environ["DT_USER"]
 pw    = os.environ["DT_PASS"]
 dom   = os.environ["DT_DOMAIN"]
@@ -176,6 +177,21 @@ fi
 
 NOW="$(date '+%Y-%m-%d %H:%M:%S')"
 
+# ====== Seksi ZIVPN (untuk pesan Telegram, opsional) ======
+ZIVPN_SECTION=""
+if [[ -n "${ZIVPN_PORT:-}" ]]; then
+  ZIVPN_SECTION=$(cat <<EOF_Z
+<b>+++++ Bonus ZIVPN UDP +++++</b>
+Host: $(printf '%s' "$DOMAIN"        | html_escape)
+Port: $(printf '%s' "$ZIVPN_PORT"    | html_escape)
+Obfs: $(printf '%s' "$ZIVPN_OBFS"    | html_escape)
+Password: $(printf '%s' "$PASSWORD"  | html_escape)
+Catatan: Gunakan aplikasi ZIVPN Tunnel (mode UDP Tunnel)
+-=================================-
+EOF_Z
+)
+fi
+
 # ====== Telegram: BERHASIL ======
 mapfile -t OK_MSG <<EOF
 Pembuatan akun <b>BERHASIL</b>!
@@ -190,6 +206,7 @@ Limit: $(printf '%s' "$LIMIT_H"   | html_escape)
 Status: $(printf '%s' "$STATUS_URL"| html_escape)
 DarkTunnel: <code>$(printf '%s' "$DARKTUNNEL_URL" | html_escape)</code>
 -=================================-
+${ZIVPN_SECTION}
 Payload (injector):
 <code>$(printf '%s' "$PAYLOAD" | html_escape)</code>
 -=================================-
@@ -212,6 +229,22 @@ echo -e "Path: ${WS_PATH}?u=${USERNAME}&p=${PASSWORD}"
 echo -e "Durasi: ${EXPIRED} Hari"
 echo -e "Limit: ${LIMIT_H}/${RESET_STRATEGY}"
 echo -e "Status: ${STATUS_URL}"
+
+# Bonus ZIVPN di output HTML (kalau tersedia)
+if [[ -n "${ZIVPN_PORT:-}" ]]; then
+  echo -e ""
+  echo -e "<b>+++++ Bonus ZIVPN UDP +++++</b>"
+if (( EXPIRED >= 90 )); then
+    echo -e "IP Address: <code>${IP_ADDR}</code>"
+fi
+  echo -e "Port: <code>${ZIVPN_PORT}</code>"
+  if [[ -n "${ZIVPN_OBFS:-}" ]]; then
+    echo -e "Obfs: <code>${ZIVPN_OBFS}</code>"
+  fi
+  echo -e "Password: <code>${PASSWORD}</code>"
+  echo -e "Gunakan aplikasi ZIVPN Tunnel (mode UDP Tunnel)"
+fi
+
 echo -e "-=================================-"
 echo -e "DarkTunnel: <code>${DARKTUNNEL_URL}</code>"
 echo -e ""
