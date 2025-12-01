@@ -244,7 +244,6 @@ fi
   echo -e "Password: <code>${PASSWORD}</code>"
   echo -e "Gunakan aplikasi ZIVPN Tunnel (mode UDP Tunnel)"
 fi
-
 echo -e "-=================================-"
 echo -e "DarkTunnel: <code>${DARKTUNNEL_URL}</code>"
 echo -e ""
